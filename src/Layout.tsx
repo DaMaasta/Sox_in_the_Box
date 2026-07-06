@@ -172,7 +172,7 @@ export default function Layout({ children, currentPageName, navigate }: LayoutPr
       </header>
 
       {/* Content */}
-      <main className="app-main" style={{ marginTop: headerHeight + 20 }}>
+      <main className="app-main" style={{ marginTop: headerHeight }}>
         {children}
       </main>
 
