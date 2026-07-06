@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from "react";
-import type { CSSProperties } from "react";
 import Layout from "./Layout";
 import Dokumente from "./pages/Dokumente";
 import Groups from "./pages/Groups";
@@ -15,25 +14,34 @@ import LoginPage from "./pages/LoginPage";
 import WelcomePage from "./pages/WelcomePage";
 import UnboxedDetail from "./pages/UnboxedDetail";
 import ItemView from "./pages/ItemView";
+import ErrorBoundary from "./components/ErrorBoundary";
+import BoxLoader from "./components/BoxLoader";
 import { useAuth } from "./contexts/AuthContext";
 import { getSpace, joinGroup } from "./services/spaces.service";
+import type { Space, Product } from "./types";
 
-export type PageName =
-  | "Dokumente"
-  | "BoxDetail"
-  | "Groups"
-  | "GroupDetail"
-  | "UnboxedDetail"
-  | "Cart"
-  | "SearchPage"
-  | "Settings"
-  | "AccountSettings"
-  | "ProductDetail"
-  | "ItemView";
+export type PageParamsMap = {
+  Groups: Record<string, never>;
+  Dokumente: Record<string, never>;
+  Cart: Record<string, never>;
+  SearchPage: Record<string, never>;
+  Settings: Record<string, never>;
+  AccountSettings: Record<string, never>;
+  GroupDetail: { group: Space };
+  BoxDetail: { box: Space; place?: Space | null };
+  UnboxedDetail: { space: Space; from?: string; fromParam?: PageParamsMap[keyof PageParamsMap] };
+  ProductDetail: { product: Product; box: Space; place?: Space | null; from?: string };
+  ItemView: { product: Product; box: Space; parent?: Space; from?: string };
+};
 
-export type PageParams = Record<string, unknown>;
+export type PageName = keyof PageParamsMap;
 
-export type NavigateFn = (page: PageName, params?: PageParams) => void;
+export type NavigateFn = <P extends PageName>(
+  page: P,
+  ...args: Record<string, never> extends PageParamsMap[P] ? [params?: PageParamsMap[P]] : [params: PageParamsMap[P]]
+) => void;
+
+export type PageParams<P extends PageName = PageName> = PageParamsMap[P];
 
 type NavDirection = "forward" | "back" | "lateral";
 
@@ -54,6 +62,31 @@ const PAGE_DEPTH: Record<PageName, number> = {
 const TAB_PAGES = new Set<PageName>(["Groups", "Dokumente", "Cart", "SearchPage", "Settings"]);
 const TAB_ORDER: PageName[] = ["Dokumente", "Groups", "Cart", "SearchPage", "Settings"];
 
+const HASH_TO_PAGE: Record<string, PageName> = {
+  "":            "Groups",
+  "lager":       "Groups",
+  "dokumente":   "Dokumente",
+  "warenkorb":   "Cart",
+  "suche":       "SearchPage",
+  "einstellungen": "Settings",
+  "konto":       "AccountSettings",
+};
+
+const PAGE_TO_HASH: Partial<Record<PageName, string>> = {
+  Groups:          "lager",
+  Dokumente:       "dokumente",
+  Cart:            "warenkorb",
+  SearchPage:      "suche",
+  Settings:        "einstellungen",
+  AccountSettings: "konto",
+};
+
+function parseHash(): { page: PageName; groupId?: string } {
+  const raw = window.location.hash.replace(/^#\/?/, "");
+  const [segment, id] = raw.split("/");
+  if (segment === "group" && id) return { page: "GroupDetail", groupId: id };
+  return { page: HASH_TO_PAGE[segment] ?? "Groups" };
+}
 
 function getPendingInvite(): string | null {
   const params = new URLSearchParams(window.location.search);
@@ -67,17 +100,23 @@ function clearInviteParam() {
 }
 
 function getInitialPage(): PageName {
-  return "Groups";
+  return parseHash().page;
 }
 
 export default function App(): React.ReactElement {
   const { user, loading } = useAuth();
   const [gatePassed, setGatePassed] = useState(() => localStorage.getItem("kistle_gate") === "1");
   const [currentPage, setCurrentPage] = useState<PageName>(getInitialPage);
-  const [pageParams, setPageParams]   = useState<PageParams>({});
+  const [pageParams, setPageParams]   = useState<PageParamsMap[PageName]>({} as PageParamsMap[PageName]);
   const [navDir, setNavDir]           = useState<NavDirection>("lateral");
   const [pendingInvite] = useState<string | null>(getPendingInvite);
   const [updateReady, setUpdateReady] = useState(false);
+  const [minSplashDone, setMinSplashDone] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setMinSplashDone(true), 3000);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
@@ -98,17 +137,29 @@ export default function App(): React.ReactElement {
   const currentPageRef = useRef<PageName>(currentPage);
   useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
 
-  // Set initial history entry so the first back-navigation has state to restore
+  // Resolve deep-link for GroupDetail on app start
   useEffect(() => {
-    window.history.replaceState({ page: "Groups", params: {} }, "");
-  }, []);
+    const { page, groupId } = parseHash();
+    window.history.replaceState({ page, params: {} }, "");
+    if (page === "GroupDetail" && groupId && user) {
+      getSpace(groupId).then((group) => {
+        if (group) {
+          setPageParams({ group });
+          setCurrentPage("GroupDetail");
+        } else {
+          setCurrentPage("Groups");
+          window.history.replaceState({ page: "Groups", params: {} }, "", "#/lager");
+        }
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   // Browser back / forward button support
   useEffect(() => {
     const handlePop = (e: PopStateEvent) => {
-      if (!e.state?.page) return;
-      const toPage = e.state.page as PageName;
-      const params = (e.state.params ?? {}) as PageParams;
+      const toPage = (e.state?.page as PageName) ?? parseHash().page;
+      const params = (e.state?.params ?? {}) as PageParamsMap[PageName];
       const fromDepth = PAGE_DEPTH[currentPageRef.current] ?? 0;
       const toDepth   = PAGE_DEPTH[toPage] ?? 0;
       setNavDir(toDepth < fromDepth ? "back" : toDepth > fromDepth ? "forward" : "lateral");
@@ -138,10 +189,10 @@ export default function App(): React.ReactElement {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, pendingInvite]);
 
-  if (loading) {
+  if (loading || !minSplashDone) {
     return (
-      <div style={spinnerStyles.root}>
-        <div style={spinnerStyles.spinner} />
+      <div className="loading-screen">
+        <BoxLoader />
       </div>
     );
   }
@@ -149,7 +200,8 @@ export default function App(): React.ReactElement {
   if (!gatePassed) return <WelcomePage onSuccess={() => { localStorage.setItem("kistle_gate", "1"); setGatePassed(true); }} />;
   if (!user) return <LoginPage />;
 
-  const navigate: NavigateFn = (page, params = {}) => {
+  const navigate: NavigateFn = (page, ...args) => {
+    const params = args[0] ?? ({} as PageParamsMap[typeof page]);
     const from = PAGE_DEPTH[currentPage] ?? 0;
     const to   = PAGE_DEPTH[page] ?? 0;
     const isTabSwitch = TAB_PAGES.has(currentPage) && TAB_PAGES.has(page);
@@ -161,58 +213,49 @@ export default function App(): React.ReactElement {
     setNavDir(dir);
     setCurrentPage(page);
     setPageParams(params);
-    window.history.pushState({ page, params }, "");
+    const groupId = page === "GroupDetail" ? (params as PageParamsMap["GroupDetail"]).group?.id : undefined;
+    const hash = page === "GroupDetail" && groupId
+      ? `#/group/${groupId}`
+      : `#/${PAGE_TO_HASH[page] ?? "lager"}`;
+    window.history.pushState({ page, params }, "", hash);
   };
 
   const renderPage = (): React.ReactElement => {
+    const p = pageParams;
     switch (currentPage) {
-      case "Dokumente":   return <Dokumente navigate={navigate} />;
-      case "BoxDetail":   return <BoxDetail navigate={navigate} params={pageParams} />;
-      case "Groups":      return <Groups navigate={navigate} />;
-      case "GroupDetail": return <GroupDetail navigate={navigate} params={pageParams} />;
-      case "UnboxedDetail": return <UnboxedDetail navigate={navigate} params={pageParams} />;
-      case "Cart":        return <Cart navigate={navigate} />;
-      case "SearchPage":  return <SearchPage navigate={navigate} />;
-      case "Settings":         return <Settings navigate={navigate} />;
-      case "AccountSettings":  return <AccountSettings navigate={navigate} />;
-      case "ProductDetail":    return <ProductDetail navigate={navigate} params={pageParams} />;
-      case "ItemView":         return <ItemView navigate={navigate} params={pageParams} />;
-      default:            return <Groups navigate={navigate} />;
+      case "Dokumente":      return <Dokumente navigate={navigate} />;
+      case "Groups":         return <Groups navigate={navigate} />;
+      case "Cart":           return <Cart navigate={navigate} />;
+      case "SearchPage":     return <SearchPage navigate={navigate} />;
+      case "Settings":       return <Settings navigate={navigate} />;
+      case "AccountSettings": return <AccountSettings navigate={navigate} />;
+      case "GroupDetail":    return <GroupDetail navigate={navigate} params={p as PageParamsMap["GroupDetail"]} />;
+      case "BoxDetail":      return <BoxDetail navigate={navigate} params={p as PageParamsMap["BoxDetail"]} />;
+      case "UnboxedDetail":  return <UnboxedDetail navigate={navigate} params={p as PageParamsMap["UnboxedDetail"]} />;
+      case "ProductDetail":  return <ProductDetail navigate={navigate} params={p as PageParamsMap["ProductDetail"]} />;
+      case "ItemView":       return <ItemView navigate={navigate} params={p as PageParamsMap["ItemView"]} />;
+      default:               return <Groups navigate={navigate} />;
     }
   };
 
   return (
     <>
       {updateReady && (
-        <div style={updateBannerStyle} onClick={() => window.location.reload()}>
+        <div
+          className="fixed top-0 left-0 right-0 z-[9999] bg-[#2C2926] text-white px-4 pt-[calc(10px+env(safe-area-inset-top))] pb-2.5 text-center text-[13px] font-semibold cursor-pointer"
+          onClick={() => window.location.reload()}
+        >
           Neue Version verfügbar – Tippen zum Aktualisieren
         </div>
       )}
       <Layout currentPageName={currentPage} navigate={navigate}>
-        <div key={currentPage} className={`page-${navDir}`}>
-          {renderPage()}
-        </div>
+        <ErrorBoundary onReset={() => navigate("Groups")}>
+          <div key={currentPage} className={`page-${navDir}`}>
+            {renderPage()}
+          </div>
+        </ErrorBoundary>
       </Layout>
     </>
   );
 }
 
-const updateBannerStyle: CSSProperties = {
-  position: "fixed", top: 0, left: 0, right: 0, zIndex: 9999,
-  background: "#2C2926", color: "#fff",
-  padding: "10px 16px",
-  paddingTop: "calc(10px + env(safe-area-inset-top))",
-  textAlign: "center", fontSize: 13, fontWeight: 600,
-  cursor: "pointer",
-};
-
-const spinnerStyles: Record<string, CSSProperties> = {
-  root: { minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f8fafc" },
-  spinner: {
-    width: 40, height: 40,
-    border: "3px solid #e2e8f0",
-    borderTopColor: "#2C2926",
-    borderRadius: "50%",
-    animation: "spin 0.8s linear infinite",
-  },
-};
