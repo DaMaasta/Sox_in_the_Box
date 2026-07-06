@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import type { CSSProperties } from "react";
-import { Plus, Minus, Camera, X, ShoppingCart, Package } from "lucide-react";
+import { Plus, Minus, Camera, ShoppingCart, Package, X } from "lucide-react";
+import BottomSheet from "../components/BottomSheet";
 import type { NavigateFn, PageParams } from "../App";
 import type { Space, Product, ProductUnit } from "../types";
 import { useAuth } from "../contexts/AuthContext";
@@ -13,15 +14,15 @@ import { subscribeToSpace } from "../services/spaces.service";
 
 interface BoxDetailProps {
   navigate: NavigateFn;
-  params: PageParams;
+  params: PageParams<"BoxDetail">;
 }
 
 const UNITS: ProductUnit[] = ["Stück", "kg", "g", "L", "ml", "Packung", "Flasche", "Dose", "Paar", "Box"];
 const emptyForm = { name: "", description: "", quantity: 1, unit: "Stück" as ProductUnit };
 
 export default function BoxDetail({ navigate, params }: BoxDetailProps): React.ReactElement {
-  const box          = params.box   as Space;
-  const passedPlace  = params.place as Space | null | undefined;
+  const box          = params.box;
+  const passedPlace  = params.place;
   const { user } = useAuth();
   const { addToCart, items: cartItems } = useCart();
   const { setHeader } = useHeader();
@@ -44,7 +45,7 @@ export default function BoxDetail({ navigate, params }: BoxDetailProps): React.R
   useEffect(() => {
     setHeader({
       title: box?.name ?? "Box",
-      onBack: () => navigate("GroupDetail", { group: place }),
+      onBack: () => place ? navigate("GroupDetail", { group: place }) : navigate("Groups"),
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [box?.name]);
@@ -113,9 +114,8 @@ export default function BoxDetail({ navigate, params }: BoxDetailProps): React.R
         )}
       </div>
 
-      {/* Formular: Neuer Gegenstand */}
       {!isViewer && showForm && (
-        <div style={styles.formCard}>
+        <BottomSheet onClose={resetForm}>
           <div style={styles.formHeader}>
             <span style={styles.formTitle}>Neuer Gegenstand</span>
             <button style={styles.closeBtn} onClick={resetForm}><X size={18} color="var(--c-text-3)" /></button>
@@ -132,7 +132,7 @@ export default function BoxDetail({ navigate, params }: BoxDetailProps): React.R
           <div style={styles.field}>
             <label style={styles.label}>Name *</label>
             <input style={styles.input} placeholder="z.B. Schraubenzieher" value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })} autoFocus />
+              onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </div>
 
           <div style={styles.field}>
@@ -174,7 +174,7 @@ export default function BoxDetail({ navigate, params }: BoxDetailProps): React.R
           <button style={{ ...styles.saveBtn, opacity: saving ? 0.7 : 1 }} onClick={handleSave} disabled={saving}>
             {saving ? "Wird gespeichert…" : "Speichern"}
           </button>
-        </div>
+        </BottomSheet>
       )}
 
       {/* Produktliste */}
@@ -242,6 +242,7 @@ export default function BoxDetail({ navigate, params }: BoxDetailProps): React.R
               unit: modalProduct.unit,
               boxId: box.id,
               boxName: box.name,
+              boxNumber: box.boxNumber ?? null,
               parentId: place?.id ?? null,
               parentName: place?.name ?? "",
             }, qty);
@@ -263,7 +264,6 @@ const styles: Record<string, CSSProperties> = {
   title:    { fontSize: 26, fontWeight: 800, color: "var(--c-text-1)", margin: 0 },
   subtitle: { fontSize: 14, color: "var(--c-text-3)", marginTop: 4 },
   newBtn:   { display: "flex", alignItems: "center", gap: 6, background: "var(--c-dark-btn)", color: "var(--c-dark-btn-text)", border: "none", borderRadius: 12, padding: "10px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" },
-  formCard: { background: "var(--c-surface)", borderRadius: 20, padding: 20, marginBottom: 20, display: "flex", flexDirection: "column", gap: 14 },
   formHeader: { display: "flex", justifyContent: "space-between", alignItems: "center" },
   formTitle:  { fontSize: 16, fontWeight: 700, color: "var(--c-text-1)" },
   closeBtn:   { background: "none", border: "none", cursor: "pointer", padding: 8, display: "flex", minWidth: 40, minHeight: 40, alignItems: "center", justifyContent: "center" },

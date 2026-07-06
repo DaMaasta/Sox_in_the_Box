@@ -11,7 +11,7 @@ export interface Space {
   id: string;
   name: string;
   description: string;
-  type: 'room' | 'cabinet' | 'shelf' | 'box' | 'fridge' | 'other';
+  type: 'box' | 'trolley' | 'kiste' | 'karton' | 'regal' | 'other';
   parentId: string | null;
   ownerId: string;
   memberIds: string[];
@@ -25,6 +25,11 @@ export interface Space {
   createdAt: Date;
   updatedAt: Date;
 }
+
+export type RawSpace = Omit<Space, 'createdAt' | 'updatedAt'> & {
+  createdAt: string;
+  updatedAt: string;
+};
 
 export type ProductUnit = 'Stück' | 'kg' | 'g' | 'L' | 'ml' | 'Packung' | 'Flasche' | 'Dose' | 'Paar' | 'Box';
 
@@ -46,6 +51,11 @@ export interface Product {
   createdAt: Date;
 }
 
+export type RawProduct = Omit<Product, 'lastModifiedAt' | 'createdAt'> & {
+  lastModifiedAt: string;
+  createdAt: string;
+};
+
 export interface CartItem {
   productId: string;
   productName: string;
@@ -55,6 +65,7 @@ export interface CartItem {
   unit: ProductUnit;
   boxId: string;
   boxName: string;
+  boxNumber?: number | null;
   parentId: string | null;
   parentName: string;
 }

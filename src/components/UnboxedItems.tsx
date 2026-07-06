@@ -133,7 +133,7 @@ export default function UnboxedItems({ space }: UnboxedItemsProps): React.ReactE
           <div style={styles.field}>
             <label style={styles.label}>Name *</label>
             <input style={styles.input} placeholder="z.B. Fußball" value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })} autoFocus={!editProductId} />
+              onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </div>
 
           <div style={styles.field}>
@@ -260,6 +260,7 @@ export default function UnboxedItems({ space }: UnboxedItemsProps): React.ReactE
               unit: modalProduct.unit,
               boxId: space.id,
               boxName: space.name,
+              boxNumber: space.boxNumber ?? null,
               parentId: null,
               parentName: "",
             }, qty);

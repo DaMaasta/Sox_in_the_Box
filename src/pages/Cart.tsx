@@ -7,7 +7,6 @@ import type { NavigateFn } from "../App";
 import { useAuth } from "../contexts/AuthContext";
 import { useCart } from "../contexts/CartContext";
 import { createBooking } from "../services/bookings.service";
-import { showBookingNotification } from "../services/notifications.service";
 
 interface CartProps {
   navigate: NavigateFn;
@@ -56,10 +55,6 @@ export default function Cart({ navigate: _navigate }: CartProps): React.ReactEle
         snapshot
       );
       const totalQty = snapshot.reduce((s, i) => s + i.cartQuantity, 0);
-      showBookingNotification(
-        "Erfolgreich abgebucht",
-        `${totalQty} Gegenstand${totalQty !== 1 ? "e" : ""} (${snapshot.length} Position${snapshot.length !== 1 ? "en" : ""})`
-      );
       clearCart();
       setSuccess({ positions: snapshot.length, total: totalQty });
     } catch {
@@ -103,7 +98,10 @@ export default function Cart({ navigate: _navigate }: CartProps): React.ReactEle
                 </div>
                 <div style={styles.itemContent}>
                   <div style={styles.itemName}>{item.productName}</div>
-                  <div style={styles.itemMeta}>{item.boxName} · {item.parentName}</div>
+                  <div style={styles.itemMeta}>
+                    {item.parentName ? `${item.parentName} › ${item.boxName}` : item.boxName}
+                    {item.boxNumber != null && <span style={styles.boxNumBadge}>#{item.boxNumber}</span>}
+                  </div>
                   <div style={styles.qtyRow}>
                     <button style={styles.qtyBtn} onClick={() => updateCartQuantity(item.productId, -1)}><Minus size={12} /></button>
                     <span style={styles.qtyLabel}>{item.cartQuantity} {item.unit}</span>
@@ -158,7 +156,8 @@ const styles: Record<string, CSSProperties> = {
   itemImgEl: { width: "100%", height: "100%", objectFit: "cover" },
   itemContent: { flex: 1, minWidth: 0 },
   itemName: { fontSize: 14, fontWeight: 600, color: "var(--c-text-1)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
-  itemMeta: { fontSize: 12, color: "var(--c-text-3)", marginTop: 2 },
+  itemMeta: { fontSize: 12, color: "var(--c-text-3)", marginTop: 2, display: "flex", alignItems: "center", gap: 5 },
+  boxNumBadge: { fontSize: 10, fontWeight: 700, color: "#2C2926", background: "var(--c-accent-bg)", borderRadius: 6, padding: "1px 5px", flexShrink: 0 },
   qtyRow: { display: "flex", alignItems: "center", gap: 8, marginTop: 6 },
   qtyBtn: { background: "var(--c-surface-2)", border: "none", borderRadius: 8, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
   qtyLabel: { fontSize: 13, fontWeight: 600, color: "var(--c-text-1)", minWidth: 40, textAlign: "center" },

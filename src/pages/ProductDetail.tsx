@@ -269,6 +269,7 @@ export default function ProductDetail({ navigate, params }: ProductDetailProps):
               unit,
               boxId: box.id,
               boxName: box.name,
+              boxNumber: box.boxNumber ?? null,
               parentId: place?.id ?? null,
               parentName: place?.name ?? "",
             }, qty);

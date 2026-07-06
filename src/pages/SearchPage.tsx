@@ -169,6 +169,7 @@ export default function SearchPage({ navigate }: SearchPageProps): React.ReactEl
               unit: p.unit,
               boxId: box.id,
               boxName: box.name,
+              boxNumber: box.boxNumber ?? null,
               parentId: parent?.id ?? null,
               parentName: parent?.name ?? "",
             }, qty);

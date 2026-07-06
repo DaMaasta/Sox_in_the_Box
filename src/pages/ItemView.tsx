@@ -111,6 +111,7 @@ export default function ItemView({ navigate, params }: ItemViewProps): React.Rea
               unit: product.unit,
               boxId: box?.id ?? "",
               boxName: box?.name ?? "",
+              boxNumber: box?.boxNumber ?? null,
               parentId: parent?.id ?? null,
               parentName: parent?.name ?? "",
             }, qty);
