@@ -53,7 +53,7 @@ export default function Layout({ children, currentPageName, navigate }: LayoutPr
   const [settled, setSettled] = useState(false);
 
   useEffect(() => {
-    const t = setTimeout(() => setSettled(true), 200);
+    const t = setTimeout(() => setSettled(true), 500);
     return () => clearTimeout(t);
   }, []);
 
