@@ -101,29 +101,54 @@
   }
 }
 
-/* ─── Bottom Nav ─────────────────────────────────────────────────────────────── */
+/* ─── Bottom Nav (Liquid-Glass-Pille) ────────────────────────────────────────── */
 .bottom-nav {
   display: flex;
   position: fixed;
-  bottom: 0; left: 0; right: 0;
-  max-width: 500px;
+  left: 16px; right: 16px;
+  bottom: calc(env(safe-area-inset-bottom) + 14px);
+  max-width: calc(500px - 32px);
   margin: 0 auto;
-  background: var(--c-surface);
-  border-top: 1px solid var(--c-border-2);
-  padding-bottom: env(safe-area-inset-bottom);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.14),
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  padding: 6px;
   z-index: 100;
+}
+.dark .bottom-nav {
+  background: rgba(30, 41, 59, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.4),
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .bnav-btn {
   flex: 1; display: flex; flex-direction: column;
-  align-items: center; gap: 3px; padding: 8px 4px;
+  align-items: center; gap: 2px; padding: 8px 4px;
   background: none; border: none;
+  border-radius: 20px;
   color: var(--c-text-3); cursor: pointer;
-  transition: color 0.15s;
+  transition: color 0.15s, background 0.2s;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
-.bnav-btn.active { color: var(--c-brand); }
+.bnav-btn.active {
+  color: var(--c-brand);
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+.dark .bnav-btn.active {
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
 .bnav-btn.active .bnav-icon { transform: scale(1.12); }
 .bnav-icon {
   width: 22px; height: 22px;
@@ -155,7 +180,7 @@
 
 .app-main {
   overscroll-behavior: none;
-  padding-bottom: calc(env(safe-area-inset-bottom) + 80px);
+  padding-bottom: calc(env(safe-area-inset-bottom) + 96px);
 }
 
 /* Desktop: gray background + shadow around the app column */
