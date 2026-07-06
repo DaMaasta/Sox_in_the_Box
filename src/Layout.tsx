@@ -77,6 +77,7 @@ export default function Layout({ children, currentPageName, navigate }: LayoutPr
     const el = headerRef.current;
     const observer = new ResizeObserver(([entry]) => {
       setHeaderHeight(entry.contentRect.height);
+      document.documentElement.style.setProperty('--header-height', `${entry.contentRect.height}px`);
     });
     observer.observe(el);
     return () => observer.disconnect();

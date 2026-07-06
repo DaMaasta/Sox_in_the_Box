@@ -68,12 +68,15 @@ export default function SearchPage({ navigate }: SearchPageProps): React.ReactEl
   const results = useMemo(() => {
     const base = products.filter((p) => p.quantity > 0);
     if (q.length === 0) return base;
-    return base.filter((p) =>
-      p.name.toLowerCase().includes(q) ||
-      p.description.toLowerCase().includes(q) ||
-      (spaceMap.get(p.spaceId)?.name ?? "").toLowerCase().includes(q) ||
-      (p.color ? (COLOR_NAMES[p.color] ?? "").includes(q) : false)
-    );
+    return base.filter((p) => {
+      const box = spaceMap.get(p.spaceId);
+      const boxNumStr = box?.boxNumber != null ? `#${box.boxNumber}` : "";
+      return p.name.toLowerCase().includes(q) ||
+        p.description.toLowerCase().includes(q) ||
+        (box?.name ?? "").toLowerCase().includes(q) ||
+        boxNumStr.toLowerCase().includes(q) ||
+        (p.color ? (COLOR_NAMES[p.color] ?? "").includes(q) : false);
+    });
   }, [q, products, spaceMap]);
 
   return (
@@ -110,7 +113,7 @@ export default function SearchPage({ navigate }: SearchPageProps): React.ReactEl
             const box    = spaceMap.get(p.spaceId);
             const parent = box?.parentId ? spaceMap.get(box.parentId) : undefined;
             return (
-              <div key={p.id} style={{ ...styles.card, cursor: "pointer" }} onClick={() => navigate("ItemView", { product: p, box, parent, from: "SearchPage" })}>
+              <div key={p.id} style={{ ...styles.card, cursor: "pointer" }} onClick={() => box && navigate("ItemView", { product: p, box, parent, from: "SearchPage" })}>
                 <div style={styles.item}>
                   <div style={styles.itemImg}>
                     {p.imageUrl
@@ -130,6 +133,7 @@ export default function SearchPage({ navigate }: SearchPageProps): React.ReactEl
                     {(parent || box) && (
                       <div style={styles.itemLocation}>
                         {parent ? `${parent.name} › ${box?.name}` : box?.name}
+                        {box?.boxNumber != null && <span style={styles.boxNumBadge}>#{box.boxNumber}</span>}
                       </div>
                     )}
                   </div>
@@ -180,7 +184,7 @@ export default function SearchPage({ navigate }: SearchPageProps): React.ReactEl
 const styles: Record<string, CSSProperties> = {
   container: { padding: "0 0 0 0" },
   stickyHeader: {
-    position: "sticky", top: 0, zIndex: 10,
+    position: "sticky", top: "var(--header-height, 64px)", zIndex: 10,
     background: "linear-gradient(to bottom, var(--c-bg) 70%, transparent 100%)",
     padding: "12px 16px 18px",
   },
@@ -204,6 +208,7 @@ const styles: Record<string, CSSProperties> = {
   itemAvail: { display: "flex", alignItems: "baseline", marginTop: 3 },
   itemQtyNum: { fontSize: 15, fontWeight: 800, color: "var(--c-text-1)" },
   itemUnit: { fontSize: 12, color: "var(--c-text-3)", marginLeft: 3 },
-  itemLocation: { fontSize: 11, color: "#2C2926", fontWeight: 600, marginTop: 2, whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis" },
+  itemLocation: { display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "#2C2926", fontWeight: 600, marginTop: 2, whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis" },
+  boxNumBadge: { fontSize: 10, fontWeight: 700, color: "#2C2926", background: "var(--c-accent-bg)", borderRadius: 6, padding: "1px 5px", flexShrink: 0 },
   cartBtn: { border: "none", borderRadius: 11, width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 },
 };
