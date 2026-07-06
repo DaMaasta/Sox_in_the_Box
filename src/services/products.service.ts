@@ -2,6 +2,7 @@ import { api } from '../config/api';
 import type { Product, RawProduct } from '../types';
 import { createCachedStore } from '../utils/cachedStore';
 import { reportError } from '../utils/errorBus';
+import { getCachedImages, setCachedImage, deleteCachedImage } from '../utils/imageCache';
 
 function deserializeProduct(p: RawProduct): Product {
   return { ...p, lastModifiedAt: new Date(p.lastModifiedAt), createdAt: new Date(p.createdAt) };
@@ -25,6 +26,28 @@ const store = createCachedStore<RawProduct, Product>({
 
 const now = () => new Date();
 
+// Fotos landen nicht in localStorage (siehe stripForPersist), sondern separat in
+// IndexedDB. Frisch vom Netzwerk geladene Fotos werden dort opportunistisch abgelegt ...
+function cacheImagesFrom(raw: RawProduct[]): void {
+  raw.forEach((p) => { if (p.imageUrl) void setCachedImage(p.id, p.imageUrl); });
+}
+
+// ... und Produkte, die (z.B. aus dem bildlosen localStorage-Cache) ohne Foto reinkommen,
+// werden per IndexedDB-Lookup nachträglich ergänzt und ein zweites Mal emittiert.
+function withImageHydration(
+  callback: (products: Product[]) => void
+): (products: Product[]) => void {
+  return (products) => {
+    callback(products);
+    const missingIds = products.filter((p) => !p.imageUrl).map((p) => p.id);
+    if (missingIds.length === 0) return;
+    void getCachedImages(missingIds).then((images) => {
+      if (Object.keys(images).length === 0) return;
+      callback(products.map((p) => (images[p.id] ? { ...p, imageUrl: images[p.id] } : p)));
+    });
+  };
+}
+
 // ── Subscriptions ─────────────────────────────────────────────────────────────
 export function subscribeToSpaceProducts(
   spaceId: string,
@@ -32,9 +55,13 @@ export function subscribeToSpaceProducts(
 ): () => void {
   return store.subscribe(
     `space:${spaceId}`,
-    () => api.get<RawProduct[]>(`/products?spaceId=${spaceId}`),
+    async () => {
+      const raw = await api.get<RawProduct[]>(`/products?spaceId=${spaceId}`);
+      cacheImagesFrom(raw);
+      return raw;
+    },
     'Produkte konnten nicht geladen werden',
-    callback
+    withImageHydration(callback)
   );
 }
 
@@ -43,9 +70,13 @@ export function subscribeToAllProducts(
 ): () => void {
   return store.subscribe(
     'all',
-    () => api.get<RawProduct[]>('/products'),
+    async () => {
+      const raw = await api.get<RawProduct[]>('/products');
+      cacheImagesFrom(raw);
+      return raw;
+    },
     'Produkte konnten nicht geladen werden',
-    callback
+    withImageHydration(callback)
   );
 }
 
@@ -57,6 +88,7 @@ export function subscribeToProductsInSpaces(
     `spaces:${spaceIds.sort().join(',')}`,
     async () => {
       const raw = await api.get<RawProduct[]>(`/products?spaceIds=${spaceIds.join(',')}`);
+      cacheImagesFrom(raw);
       // Seed individual space caches so BoxDetail loads instantly from cache
       const bySpace = new Map<string, RawProduct[]>();
       raw.forEach(p => {
@@ -69,7 +101,7 @@ export function subscribeToProductsInSpaces(
       return raw;
     },
     'Produkte konnten nicht geladen werden',
-    callback
+    withImageHydration(callback)
   );
 }
 
@@ -86,6 +118,7 @@ export async function createProduct(
     lastModifiedAt: now(), createdAt: now(), ...data,
   };
   store.setCreate(id, optimistic);
+  if (data.imageUrl) void setCachedImage(id, data.imageUrl);
   try {
     await api.post('/products', { id, ...data, spaceId });
     return id;
@@ -105,6 +138,7 @@ export async function updateProduct(
   data: Partial<Omit<Product, 'id' | 'spaceId' | 'createdAt'>>
 ): Promise<void> {
   store.setUpdate(productId, data);
+  if (data.imageUrl) void setCachedImage(productId, data.imageUrl);
   try {
     await api.put(`/products/${productId}`, data);
   } catch (err) {
@@ -118,6 +152,7 @@ export async function updateProduct(
 
 export async function deleteProduct(productId: string): Promise<void> {
   store.setDelete(productId);
+  void deleteCachedImage(productId);
   try {
     await api.delete(`/products/${productId}`);
   } catch (err) {
