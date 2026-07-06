@@ -90,6 +90,7 @@
 
   body {
     min-height: 100dvh;
+    overflow-x: hidden;
     overscroll-behavior: none;
     background-color: var(--c-bg);
     background-image: none;
@@ -153,7 +154,6 @@
 }
 
 .app-main {
-  overflow-x: hidden;
   overscroll-behavior: none;
   padding-bottom: calc(env(safe-area-inset-bottom) + 80px);
 }
