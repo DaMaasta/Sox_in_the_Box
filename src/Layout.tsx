@@ -86,6 +86,24 @@ export default function Layout({ children, currentPageName, navigate }: LayoutPr
     return () => observer.disconnect();
   }, []);
 
+  // iOS finalizes safe-area-inset-*/dvh for a freshly launched standalone PWA only after
+  // the first scroll/reflow. Nudge a 1px scroll immediately so header/nav settle into
+  // their correct position before the user notices, instead of waiting for a real scroll.
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      window.scrollTo(0, 1);
+      requestAnimationFrame(() => {
+        window.scrollTo(0, 0);
+        if (headerRef.current) {
+          const height = headerRef.current.getBoundingClientRect().height;
+          setHeaderHeight(height);
+          document.documentElement.style.setProperty('--header-height', `${height}px`);
+        }
+      });
+    });
+    return () => cancelAnimationFrame(id);
+  }, []);
+
   useEffect(() => {
     if (!user) return;
     if (getNotificationsEnabled() && Notification.permission === 'granted') {
