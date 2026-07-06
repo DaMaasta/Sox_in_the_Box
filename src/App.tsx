@@ -196,6 +196,7 @@ export default function App(): React.ReactElement {
         <BoxLoader />
         <div className="loading-screen-logo">
           <KistleLogoOutline />
+          <span>Kistle</span>
         </div>
       </div>
     );

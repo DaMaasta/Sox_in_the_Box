@@ -145,8 +145,14 @@
 }
 .loading-screen-logo {
   position: absolute;
-  bottom: calc(env(safe-area-inset-bottom) + 32px);
+  bottom: calc(env(safe-area-inset-bottom) + 12px);
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
   color: var(--c-text-3, #9CA3AF);
+}
+.loading-screen-logo span {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 /* ─── Tailwind base ──────────────────────────────────────────────────────────── */
