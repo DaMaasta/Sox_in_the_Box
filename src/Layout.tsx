@@ -47,15 +47,6 @@ export default function Layout({ children, currentPageName, navigate }: LayoutPr
   const headerRef = useRef<HTMLElement>(null);
   const pillTitleRef = useRef<HTMLDivElement>(null);
   const [headerHeight, setHeaderHeight] = useState(64);
-  // iOS only finalizes its safe-area/viewport metrics for a freshly launched standalone
-  // PWA a short moment after first paint. Rather than let the user see header/nav jump
-  // into their correct spot, stay invisible for that brief window and fade in once done.
-  const [settled, setSettled] = useState(false);
-
-  useEffect(() => {
-    const t = setTimeout(() => setSettled(true), 500);
-    return () => clearTimeout(t);
-  }, []);
 
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -119,7 +110,7 @@ export default function Layout({ children, currentPageName, navigate }: LayoutPr
   const unreadCount = notifications.length;
 
   return (
-    <div className="app-shell" style={{ opacity: settled ? 1 : 0, transition: settled ? "opacity 0.15s ease" : "none" }}>
+    <div className="app-shell">
       {/* Header */}
       <header ref={headerRef} className="app-header flex items-center justify-between px-4 pt-[max(10px,env(safe-area-inset-top))] pb-2.5 bg-c-surface shrink-0">
         <div className="flex items-center flex-1 min-w-0">
