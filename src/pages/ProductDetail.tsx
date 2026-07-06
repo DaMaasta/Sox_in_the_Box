@@ -6,8 +6,7 @@ import type { Product, ProductUnit } from "../types";
 import { useAuth } from "../contexts/AuthContext";
 import { useCart } from "../contexts/CartContext";
 import { useHeader } from "../contexts/HeaderContext";
-import { updateProduct, deleteProduct } from "../services/products.service";
-import { compressImageToBase64 } from "../utils/imageUtils";
+import { updateProduct, deleteProduct, uploadProductImage } from "../services/products.service";
 import QuantityModal from "../components/QuantityModal";
 
 interface ProductDetailProps {
@@ -75,12 +74,11 @@ export default function ProductDetail({ navigate, params }: ProductDetailProps):
     setSaving(true);
     setSaveSuccess(false);
     try {
-      let imageUrl: string | null = product.imageUrl;
-      if (imageFile) imageUrl = await compressImageToBase64(imageFile);
       await updateProduct(product.id, user.uid, user.email ?? "", {
-        name: name.trim(), description: description.trim(), quantity, unit, imageUrl,
+        name: name.trim(), description: description.trim(), quantity, unit,
         ...(color ? { color } : {}),
       });
+      if (imageFile) await uploadProductImage(product.id, imageFile);
       setSaveSuccess(true);
       setTimeout(() => navigate("BoxDetail", { box, place: place ?? null }), 800);
     } catch {

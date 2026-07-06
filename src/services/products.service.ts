@@ -3,6 +3,7 @@ import type { Product, RawProduct } from '../types';
 import { createCachedStore } from '../utils/cachedStore';
 import { reportError } from '../utils/errorBus';
 import { getCachedImages, setCachedImage, deleteCachedImage } from '../utils/imageCache';
+import { compressImageToBlob } from '../utils/imageUtils';
 
 function deserializeProduct(p: RawProduct): Product {
   return { ...p, lastModifiedAt: new Date(p.lastModifiedAt), createdAt: new Date(p.createdAt) };
@@ -173,9 +174,12 @@ export async function updateQuantity(
   await updateProduct(productId, userId, userEmail, { quantity });
 }
 
-export async function uploadProductImage(file: File): Promise<string> {
+export async function uploadProductImage(productId: string, file: File): Promise<string> {
+  const compressed = await compressImageToBlob(file);
   const formData = new FormData();
-  formData.append('image', file);
-  const { url } = await api.upload<{ url: string }>('/images', formData);
-  return url;
+  formData.append('image', compressed);
+  const { imageUrl } = await api.upload<{ imageUrl: string }>(`/products/${productId}/image`, formData);
+  void setCachedImage(productId, imageUrl);
+  store.triggerReload();
+  return imageUrl;
 }

@@ -7,9 +7,8 @@ import type { Space, Product, ProductUnit } from "../types";
 import { useAuth } from "../contexts/AuthContext";
 import { useCart } from "../contexts/CartContext";
 import { useHeader } from "../contexts/HeaderContext";
-import { compressImageToBase64 } from "../utils/imageUtils";
 import QuantityModal from "../components/QuantityModal";
-import { subscribeToSpaceProducts, createProduct } from "../services/products.service";
+import { subscribeToSpaceProducts, createProduct, uploadProductImage } from "../services/products.service";
 import { subscribeToSpace } from "../services/spaces.service";
 
 interface BoxDetailProps {
@@ -83,13 +82,12 @@ export default function BoxDetail({ navigate, params }: BoxDetailProps): React.R
     if (!form.name.trim() || !user || saving) return;
     setSaving(true);
     try {
-      let imageUrl: string | null = null;
-      if (imageFile) imageUrl = await compressImageToBase64(imageFile);
-      await createProduct(box.id, user.uid, user.email ?? "", {
+      const id = await createProduct(box.id, user.uid, user.email ?? "", {
         name: form.name.trim(), description: form.description.trim(),
         quantity: form.quantity, unit: form.unit,
-        minQuantity: null, category: "", barcode: null, imageUrl,
+        minQuantity: null, category: "", barcode: null, imageUrl: null,
       });
+      if (imageFile) await uploadProductImage(id, imageFile);
       resetForm();
     } finally { setSaving(false); }
   };

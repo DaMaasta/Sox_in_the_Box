@@ -4,13 +4,13 @@ import { Plus, Minus, Trash2, Camera, X, Pencil, ShoppingCart, Package } from "l
 import type { Space, Product, ProductUnit } from "../types";
 import { useAuth } from "../contexts/AuthContext";
 import { useCart } from "../contexts/CartContext";
-import { compressImageToBase64 } from "../utils/imageUtils";
 import QuantityModal from "./QuantityModal";
 import {
   subscribeToSpaceProducts,
   createProduct,
   updateProduct,
   deleteProduct,
+  uploadProductImage,
 } from "../services/products.service";
 
 interface UnboxedItemsProps {
@@ -75,20 +75,19 @@ export default function UnboxedItems({ space }: UnboxedItemsProps): React.ReactE
     if (!form.name.trim() || !user || saving) return;
     setSaving(true);
     try {
-      let imageUrl: string | null = existingImageUrl;
-      if (imageFile) imageUrl = await compressImageToBase64(imageFile);
-
       if (editProductId) {
         await updateProduct(editProductId, user.uid, user.email ?? "", {
           name: form.name.trim(), description: form.description.trim(),
-          quantity: form.quantity, unit: form.unit, imageUrl,
+          quantity: form.quantity, unit: form.unit,
         });
+        if (imageFile) await uploadProductImage(editProductId, imageFile);
       } else {
-        await createProduct(space.id, user.uid, user.email ?? "", {
+        const id = await createProduct(space.id, user.uid, user.email ?? "", {
           name: form.name.trim(), description: form.description.trim(),
           quantity: form.quantity, unit: form.unit,
-          minQuantity: null, category: "", barcode: null, imageUrl,
+          minQuantity: null, category: "", barcode: null, imageUrl: null,
         });
+        if (imageFile) await uploadProductImage(id, imageFile);
       }
       resetForm();
     } finally { setSaving(false); }
