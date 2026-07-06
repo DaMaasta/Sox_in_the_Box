@@ -75,9 +75,10 @@ export default function Layout({ children, currentPageName, navigate }: LayoutPr
   useEffect(() => {
     if (!headerRef.current) return;
     const el = headerRef.current;
-    const observer = new ResizeObserver(([entry]) => {
-      setHeaderHeight(entry.contentRect.height);
-      document.documentElement.style.setProperty('--header-height', `${entry.contentRect.height}px`);
+    const observer = new ResizeObserver(() => {
+      const height = el.getBoundingClientRect().height;
+      setHeaderHeight(height);
+      document.documentElement.style.setProperty('--header-height', `${height}px`);
     });
     observer.observe(el);
     return () => observer.disconnect();
