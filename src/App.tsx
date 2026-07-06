@@ -16,6 +16,7 @@ import UnboxedDetail from "./pages/UnboxedDetail";
 import ItemView from "./pages/ItemView";
 import ErrorBoundary from "./components/ErrorBoundary";
 import BoxLoader from "./components/BoxLoader";
+import KistleLogoOutline from "./components/KistleLogoOutline";
 import { useAuth } from "./contexts/AuthContext";
 import { getSpace, joinGroup } from "./services/spaces.service";
 import type { Space, Product } from "./types";
@@ -114,7 +115,7 @@ export default function App(): React.ReactElement {
   const [minSplashDone, setMinSplashDone] = useState(false);
 
   useEffect(() => {
-    const t = setTimeout(() => setMinSplashDone(true), 3000);
+    const t = setTimeout(() => setMinSplashDone(true), 2000);
     return () => clearTimeout(t);
   }, []);
 
@@ -193,6 +194,9 @@ export default function App(): React.ReactElement {
     return (
       <div className="loading-screen">
         <BoxLoader />
+        <div className="loading-screen-logo">
+          <KistleLogoOutline />
+        </div>
       </div>
     );
   }
