@@ -85,13 +85,11 @@
   *, *::before, *::after { box-sizing: border-box; }
 
   html {
-    overflow: hidden;
-    height: 100%;
     background-color: var(--c-bg);
   }
 
   body {
-    height: 100dvh;
+    min-height: 100dvh;
     overscroll-behavior: none;
     background-color: var(--c-bg);
     background-image: none;
@@ -102,31 +100,68 @@
   }
 }
 
+/* ─── Bottom Nav ─────────────────────────────────────────────────────────────── */
+.bottom-nav {
+  display: flex;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  max-width: 500px;
+  margin: 0 auto;
+  background: var(--c-surface);
+  border-top: 1px solid var(--c-border-2);
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 100;
+}
+
+.bnav-btn {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; gap: 3px; padding: 8px 4px;
+  background: none; border: none;
+  color: var(--c-text-3); cursor: pointer;
+  transition: color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.bnav-btn.active { color: var(--c-brand); }
+.bnav-btn.active .bnav-icon { transform: scale(1.12); }
+.bnav-icon {
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+  transition: transform 0.15s;
+}
+.bnav-label { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.02em; }
+
 /* ─── App shell ──────────────────────────────────────────────────────────────── */
 .app-shell {
   display: flex;
   flex-direction: column;
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  min-height: 100dvh;
   margin: 0 auto;
   width: 100%;
   max-width: 500px;
-  overflow: clip;
   background-color: var(--c-bg);
   background-image: none;
 }
 
+.app-header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  max-width: 500px;
+  margin: 0 auto;
+  z-index: 100;
+}
+
+.app-main {
+  overflow-x: hidden;
+  overscroll-behavior: none;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 80px);
+}
 
 /* Desktop: gray background + shadow around the app column */
 @media (min-width: 501px) {
   body {
     background: #A8A099;
-  }
-  .app-shell {
-    
   }
 }
 

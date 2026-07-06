@@ -5,7 +5,7 @@ import { User, ChevronRight, LogOut, Bell } from "lucide-react";
 import type { NavigateFn } from "../App";
 import { useAuth } from "../contexts/AuthContext";
 import { logoutUser } from "../services/auth.service";
-import { isNotificationSupported, requestNotificationPermission, getNotificationsEnabled, setNotificationsEnabled } from "../services/notifications.service";
+import { isNotificationSupported, requestNotificationPermission, getNotificationsEnabled, setNotificationsEnabled, subscribeToPush, unsubscribeFromPush } from "../services/notifications.service";
 
 interface RowProps {
   icon: React.ElementType;
@@ -60,9 +60,11 @@ export default function Settings({ navigate }: { navigate: NavigateFn }): React.
       }
       setNotificationsEnabled(true);
       setNotifEnabled(true);
+      await subscribeToPush();
     } else {
       setNotificationsEnabled(false);
       setNotifEnabled(false);
+      await unsubscribeFromPush();
     }
   };
 
@@ -111,7 +113,7 @@ export default function Settings({ navigate }: { navigate: NavigateFn }): React.
 }
 
 const styles: Record<string, CSSProperties> = {
-  container: { padding: "20px 16px", height: "100%", overflowY: "auto" as const },
+  container: { padding: "20px 16px" },
   profileHeader: { marginBottom: 24 },
   profileName: { fontSize: 26, fontWeight: 800, color: "var(--c-text-1)" },
   title:    { fontSize: 28, fontWeight: 800, color: "var(--c-text-1)", margin: 0 },

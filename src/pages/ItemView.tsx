@@ -2,14 +2,13 @@ import React, { useState } from "react";
 import type { CSSProperties } from "react";
 import { ShoppingCart, MapPin, Tag, Hash } from "lucide-react";
 import type { NavigateFn, PageParams } from "../App";
-import type { Product, Space } from "../types";
 import { useCart } from "../contexts/CartContext";
 import { useHeader } from "../contexts/HeaderContext";
 import QuantityModal from "../components/QuantityModal";
 
 interface ItemViewProps {
   navigate: NavigateFn;
-  params: PageParams;
+  params: PageParams<"ItemView">;
 }
 
 const COLOR_LABELS: Record<string, string> = {
@@ -24,10 +23,10 @@ const COLOR_LABELS: Record<string, string> = {
 };
 
 export default function ItemView({ navigate, params }: ItemViewProps): React.ReactElement {
-  const product = params.product as Product;
-  const box     = params.box     as Space;
-  const parent  = params.parent  as Space | undefined;
-  const from    = (params.from   as string) ?? "SearchPage";
+  const product = params.product;
+  const box     = params.box;
+  const parent  = params.parent;
+  const from    = params.from ?? "SearchPage";
 
   const { addToCart, items: cartItems } = useCart();
   const { setHeader } = useHeader();

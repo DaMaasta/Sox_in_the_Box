@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import type { CSSProperties } from "react";
-import { Camera, Plus, Minus, Trash2, ShoppingCart } from "lucide-react";
+import { Camera, Plus, Minus, Trash2, ShoppingCart, Pencil } from "lucide-react";
 import type { NavigateFn, PageParams } from "../App";
-import type { Space, Product, ProductUnit } from "../types";
+import type { Product, ProductUnit } from "../types";
 import { useAuth } from "../contexts/AuthContext";
 import { useCart } from "../contexts/CartContext";
 import { useHeader } from "../contexts/HeaderContext";
@@ -12,17 +12,17 @@ import QuantityModal from "../components/QuantityModal";
 
 interface ProductDetailProps {
   navigate: NavigateFn;
-  params: PageParams;
+  params: PageParams<"ProductDetail">;
 }
 
 const UNITS: ProductUnit[] = ["Stück", "kg", "g", "L", "ml", "Packung", "Flasche", "Dose", "Paar", "Box"];
 const PRODUCT_COLORS = ["#2C2926","#ef4444","#eab308","#22c55e","#14b8a6","#3b82f6","#8b5cf6","#ec4899"];
 
 export default function ProductDetail({ navigate, params }: ProductDetailProps): React.ReactElement {
-  const product = params.product as Product;
-  const box     = params.box     as Space;
-  const place   = params.place   as Space | undefined;
-  const from    = (params.from   as string) ?? "BoxDetail";
+  const product = params.product;
+  const box     = params.box;
+  const place   = params.place;
+  const from    = params.from ?? "BoxDetail";
 
   const { user } = useAuth();
   const { addToCart, items: cartItems } = useCart();
@@ -37,6 +37,7 @@ export default function ProductDetail({ navigate, params }: ProductDetailProps):
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product.name]);
 
+  const [nameFocused, setNameFocused] = useState(false);
   const [name,        setName]        = useState(product.name);
   const [description, setDescription] = useState(product.description);
   const [quantity,    setQuantity]    = useState(product.quantity);
@@ -124,13 +125,28 @@ export default function ProductDetail({ navigate, params }: ProductDetailProps):
       </button>
 
       {/* Name */}
-      <input
-        style={{ ...styles.nameInput, ...(isViewer ? { cursor: "default" } : {}) }}
-        value={name}
-        onChange={(e) => { if (!isViewer) { setName(e.target.value); setSaveSuccess(false); } }}
-        placeholder="Name"
-        readOnly={isViewer}
-      />
+      <div style={{ position: "relative" }}>
+        <input
+          style={{
+            ...styles.nameInput,
+            ...(isViewer ? { cursor: "default" } : {}),
+            borderBottom: !isViewer ? `2px solid ${nameFocused ? "var(--c-text-1)" : "transparent"}` : "none",
+            paddingBottom: !isViewer ? 2 : 0,
+            paddingRight: !isViewer ? 28 : 0,
+            transition: "border-color 0.15s",
+          }}
+          value={name}
+          onChange={(e) => { if (!isViewer) { setName(e.target.value); setSaveSuccess(false); } }}
+          onFocus={() => setNameFocused(true)}
+          onBlur={() => setNameFocused(false)}
+          placeholder="Name"
+          readOnly={isViewer}
+        />
+        {!isViewer && !nameFocused && (
+          <Pencil size={15} color="var(--c-text-3)"
+            style={{ position: "absolute", right: 2, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+        )}
+      </div>
 
       {/* Beschreibung */}
       <div style={styles.card}>
@@ -186,10 +202,13 @@ export default function ProductDetail({ navigate, params }: ProductDetailProps):
         <div style={styles.card}>
           <div style={styles.colorPickerRow}>
             {PRODUCT_COLORS.map((c) => (
-              <button key={c}
-                style={{ ...styles.colorSwatch, background: c, boxShadow: color === c ? `0 0 0 2px #fff, 0 0 0 4px ${c}` : "none" }}
-                onClick={() => { setColor(color === c ? "" : c); setSaveSuccess(false); }}
-              />
+              <button type="button" key={c}
+                style={styles.colorSwatchBtn}
+                onClick={() => { setColor(color === c ? "" : c); setSaveSuccess(false); }}>
+                <div style={{ ...styles.colorSwatch, background: c,
+                  boxShadow: color === c ? `0 0 0 3px var(--c-surface), 0 0 0 5px ${c}` : "none",
+                  transform: color === c ? "scale(1.2)" : "scale(1)" }} />
+              </button>
             ))}
           </div>
         </div>
@@ -300,8 +319,9 @@ const styles: Record<string, CSSProperties> = {
   qtyInput: { fontSize: 20, fontWeight: 800, color: "var(--c-text-1)", minWidth: 32, width: 56, textAlign: "center", border: "none", outline: "none", background: "transparent", padding: 0 },
   select:   { marginLeft: "auto", border: "1px solid var(--c-border)", borderRadius: 8, padding: "6px 8px", fontSize: 14, background: "var(--c-bg)", color: "var(--c-text-1)", outline: "none" },
 
-  colorPickerRow: { display: "flex", gap: 8, padding: "10px 12px", flexWrap: "wrap" as const },
-  colorSwatch:    { width: 26, height: 26, borderRadius: "50%", border: "none", cursor: "pointer", padding: 0, flexShrink: 0, transition: "box-shadow 0.15s" },
+  colorPickerRow:  { display: "flex", gap: 0, padding: "6px 8px", flexWrap: "wrap" as const },
+  colorSwatchBtn:  { width: 44, height: 44, borderRadius: "50%", border: "none", cursor: "pointer", padding: 0, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", touchAction: "manipulation" as const },
+  colorSwatch:     { width: 26, height: 26, borderRadius: "50%", flexShrink: 0, transition: "box-shadow 0.15s, transform 0.15s" },
 
   bottomRow: { display: "flex", gap: 8, alignItems: "center", marginTop: "auto", flexShrink: 0 },
   deleteIconBtn: { width: 42, height: 42, background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 },
