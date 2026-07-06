@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef } from "react";
 import clsx from "clsx";
 import { FolderOpen, MapPin, ShoppingCart, Search, Settings, Bell, X, ChevronLeft, WifiOff } from "lucide-react";
 import { getInitials } from "./utils/stringUtils";
@@ -72,14 +72,16 @@ export default function Layout({ children, currentPageName, navigate }: LayoutPr
     window.scrollTo(0, 0);
   }, [currentPageName]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!headerRef.current) return;
     const el = headerRef.current;
-    const observer = new ResizeObserver(() => {
+    const apply = () => {
       const height = el.getBoundingClientRect().height;
       setHeaderHeight(height);
       document.documentElement.style.setProperty('--header-height', `${height}px`);
-    });
+    };
+    apply();
+    const observer = new ResizeObserver(apply);
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
