@@ -86,46 +86,6 @@ export default function Layout({ children, currentPageName, navigate }: LayoutPr
     return () => observer.disconnect();
   }, []);
 
-  // iOS finalizes safe-area-inset-*/dvh for a freshly launched standalone PWA only after
-  // the first real scroll/reflow, so fixed-position header/nav can sit slightly wrong
-  // until then. Two requestAnimationFrame calls back-to-back can get coalesced into a
-  // single repaint by the browser, so use real (short) timeouts to force two distinct
-  // paints, and re-measure the header once done. visualViewport's resize event is the
-  // authoritative signal that iOS actually finished settling, so also hook that as a
-  // catch-all in case the timed nudge fires before iOS is ready.
-  useEffect(() => {
-    const remeasure = () => {
-      if (!headerRef.current) return;
-      const height = headerRef.current.getBoundingClientRect().height;
-      setHeaderHeight(height);
-      document.documentElement.style.setProperty('--header-height', `${height}px`);
-    };
-    const nudge = () => {
-      window.scrollTo(0, 1);
-      setTimeout(() => {
-        window.scrollTo(0, 0);
-        remeasure();
-      }, 60);
-    };
-    const t = setTimeout(nudge, 60);
-
-    // Only watch for the initial post-launch settle, not later legitimate resizes
-    // (e.g. the keyboard opening), which would otherwise re-trigger the scroll nudge.
-    const vv = window.visualViewport;
-    const onViewportResize = () => {
-      nudge();
-      vv?.removeEventListener('resize', onViewportResize);
-    };
-    vv?.addEventListener('resize', onViewportResize);
-    const stopWatching = setTimeout(() => vv?.removeEventListener('resize', onViewportResize), 2000);
-
-    return () => {
-      clearTimeout(t);
-      clearTimeout(stopWatching);
-      vv?.removeEventListener('resize', onViewportResize);
-    };
-  }, []);
-
   useEffect(() => {
     if (!user) return;
     if (getNotificationsEnabled() && Notification.permission === 'granted') {
