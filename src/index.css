@@ -134,6 +134,8 @@
 .boxes .face-back  { transform: rotateY(180deg) translateZ(calc(var(--size) / 2)); }
 .boxes .face-right { --bg: #F5A030; transform: rotateY(90deg) translateZ(calc(var(--size) / 2)); }
 .boxes .face-top    { --bg: #534D41; transform: rotateX(90deg) translateZ(calc(var(--size) / 2)); }
+.boxes .face-left   { --bg: #F5A030; transform: rotateY(-90deg) translateZ(calc(var(--size) / 2)); }
+.boxes .face-bottom { --bg: #1a1815; transform: rotateX(-90deg) translateZ(calc(var(--size) / 2)); }
 
 .loading-screen {
   position: fixed; inset: 0;
