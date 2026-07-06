@@ -106,7 +106,7 @@
   display: flex;
   position: fixed;
   left: 16px; right: 16px;
-  bottom: calc(env(safe-area-inset-bottom) + 14px);
+  bottom: calc(env(safe-area-inset-bottom) + 6px);
   max-width: calc(500px - 32px);
   margin: 0 auto;
   border-radius: 28px;
@@ -184,7 +184,7 @@
 
 .app-main {
   overscroll-behavior: none;
-  padding-bottom: calc(env(safe-area-inset-bottom) + 96px);
+  padding-bottom: calc(env(safe-area-inset-bottom) + 88px);
 }
 
 /* Desktop: gray background + shadow around the app column */
