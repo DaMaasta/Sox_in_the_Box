@@ -67,6 +67,40 @@ export function createCachedStore<TRaw, T extends { id: string }>(
     return sort ? sort(optimistic) : optimistic;
   }
 
+  function allCacheKeys(): string[] {
+    const keys = new Set(cache.keys());
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith(lsPrefix))
+      .forEach((key) => keys.add(key.slice(lsPrefix.length)));
+    return [...keys];
+  }
+
+  function patchCachedItems(updates: Array<{ id: string; data: Partial<T> }>): void {
+    if (updates.length === 0) return;
+    const byId = new Map(updates.map((update) => [update.id, update.data]));
+    allCacheKeys().forEach((key) => {
+      const items = cacheGet(key);
+      if (!items) return;
+      let changed = false;
+      const next = items.map((item) => {
+        const update = byId.get(item.id);
+        if (!update) return item;
+        changed = true;
+        return { ...item, ...update };
+      });
+      if (changed) cacheSet(key, next);
+    });
+    triggerReload();
+  }
+
+  function invalidateCache(): void {
+    cache.clear();
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith(lsPrefix))
+      .forEach((key) => localStorage.removeItem(key));
+    triggerReload();
+  }
+
   function subscribe(
     cacheKey: string,
     fetcher: () => Promise<TRaw[]>,
@@ -131,6 +165,8 @@ export function createCachedStore<TRaw, T extends { id: string }>(
     subscribe,
     subscribeSingle,
     seedCache(key: string, items: T[]) { cacheSet(key, items); },
+    patchCachedItems,
+    invalidateCache,
     setCreate(id: string, item: T) { pendingCreates.set(id, item); triggerReload(); },
     setUpdate(id: string, data: Partial<T>) {
       const prev = pendingUpdates.get(id);

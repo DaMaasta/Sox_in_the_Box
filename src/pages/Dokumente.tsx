@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
-import type { CSSProperties } from "react";
+import clsx from "clsx";
 import {
-  FolderOpen, Folder, FileText, File as FileIcon, Image as ImageIcon,
-  Plus, Upload, ChevronRight, ChevronLeft, Trash2, X, Check, Pencil,
+  FolderOpen, Folder,
+  Plus, Upload, ChevronRight, ChevronLeft, X, Check,
   AlertTriangle,
 } from "lucide-react";
 import type { NavigateFn } from "../App";
@@ -15,6 +15,9 @@ import {
   uploadFile, deleteFile,
   type DocFolder, type DocFile,
 } from "../services/documents.service";
+import ImagePreview from "./dokumente/ImagePreview";
+import FolderRow from "./dokumente/FolderRow";
+import FileRow from "./dokumente/FileRow";
 
 interface DokumenteProps {
   navigate: NavigateFn;
@@ -22,82 +25,37 @@ interface DokumenteProps {
 
 interface Breadcrumb { id: string | null; name: string; }
 
-// ─── Helper functions ─────────────────────────────────────────────────────────
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function fileIconColor(mimeType: string): string {
-  if (mimeType.startsWith("image/")) return "#22c55e";
-  if (mimeType === "application/pdf") return "#ef4444";
-  if (mimeType.includes("word") || mimeType.includes("document")) return "#3b82f6";
-  if (mimeType.includes("sheet") || mimeType.includes("excel")) return "#16a34a";
-  if (mimeType.includes("presentation") || mimeType.includes("powerpoint")) return "#f59e0b";
-  return "#94a3b8";
-}
-
-function fileIconBg(mimeType: string): string {
-  if (mimeType.startsWith("image/")) return "#dcfce7";
-  if (mimeType === "application/pdf") return "#fee2e2";
-  if (mimeType.includes("word") || mimeType.includes("document")) return "#dbeafe";
-  if (mimeType.includes("sheet") || mimeType.includes("excel")) return "#dcfce7";
-  if (mimeType.includes("presentation") || mimeType.includes("powerpoint")) return "#fef3c7";
-  return "var(--c-surface-2)";
-}
-
-function FileTypeIcon({ mimeType, size = 20 }: { mimeType: string; size?: number }): React.ReactElement {
-  const color = fileIconColor(mimeType);
-  if (mimeType.startsWith("image/")) return <ImageIcon size={size} color={color} />;
-  if (mimeType === "application/pdf" || mimeType.includes("word") || mimeType.includes("document") ||
-    mimeType.includes("sheet") || mimeType.includes("presentation"))
-    return <FileText size={size} color={color} />;
-  return <FileIcon size={size} color={color} />;
-}
-
-// ─── Main component ───────────────────────────────────────────────────────────
-
 export default function Dokumente({ navigate: _navigate }: DokumenteProps): React.ReactElement {
   const { user } = useAuth();
   const { setHeader, clearHeader } = useHeader();
 
-  // Navigation state
   const [folderId, setFolderId] = useState<string | null>(null);
   const [crumbs, setCrumbs] = useState<Breadcrumb[]>([{ id: null, name: "Dokumente" }]);
   const [animKey, setAnimKey]   = useState(0);
   const [animDir, setAnimDir]   = useState<"forward" | "back">("forward");
 
-  // Content
   const [folders, setFolders] = useState<DocFolder[]>([]);
   const [files, setFiles] = useState<DocFile[]>([]);
 
-  // Folder creation
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [creating, setCreating] = useState(false);
-  const newFolderActiveRef = useRef(false); // synchronous guard for handleCreateFolder
+  const newFolderActiveRef = useRef(false);
 
-  // Folder rename
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [editFolderName, setEditFolderName] = useState("");
 
-  // Delete confirmation
   const [deleteFolderConfirm, setDeleteFolderConfirm] = useState<string | null>(null);
   const [deleteFileConfirm, setDeleteFileConfirm] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // Upload
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Image preview
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  // Space-verknüpfte Ordner (für alle Mitglieder sichtbar)
   const [spaceFolders, setSpaceFolders] = useState<(DocFolder & { space_name: string })[]>([]);
   const [sharedRootId, setSharedRootId] = useState<string | null>(null);
 
@@ -115,7 +73,6 @@ export default function Dokumente({ navigate: _navigate }: DokumenteProps): Reac
     });
   }, [user, folderId]);
 
-  // Header-Titel bei Ordner-Navigation setzen
   useEffect(() => {
     if (crumbs.length > 1) {
       const current = crumbs[crumbs.length - 1];
@@ -129,7 +86,6 @@ export default function Dokumente({ navigate: _navigate }: DokumenteProps): Reac
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [crumbs]);
 
-  // Auto-clear delete confirmations after 3s
   useEffect(() => {
     if (!deleteFolderConfirm && !deleteFileConfirm) return;
     const t = setTimeout(() => {
@@ -244,7 +200,6 @@ export default function Dokumente({ navigate: _navigate }: DokumenteProps): Reac
         setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
       }
     } catch {
-      // fallback: direct open
       window.open(file.url, "_blank");
     }
   };
@@ -260,7 +215,6 @@ export default function Dokumente({ navigate: _navigate }: DokumenteProps): Reac
     }
   };
 
-  // Eigene Ordner-IDs — Space-Ordner die der User selbst besitzt nicht doppelt anzeigen
   const ownFolderIds = new Set(folders.map(f => f.id));
   const visibleSpaceFolders = folderId === null
     ? spaceFolders.filter(sf => !ownFolderIds.has(sf.id))
@@ -270,70 +224,51 @@ export default function Dokumente({ navigate: _navigate }: DokumenteProps): Reac
   const isReadOnly = sharedRootId !== null && crumbs.some(c => c.id === sharedRootId);
 
   return (
-    <div style={styles.container}>
+    <div className="p-5 px-4 w-full box-border">
 
-      {/* Image preview modal */}
-      {previewUrl && (
-        <div style={styles.previewOverlay} onClick={() => setPreviewUrl(null)}>
-          <button style={styles.previewClose} onClick={() => setPreviewUrl(null)}>
-            <X size={20} color="#fff" />
-          </button>
-          <img
-            src={previewUrl}
-            alt="Vorschau"
-            style={styles.previewImg}
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
-      )}
+      {previewUrl && <ImagePreview url={previewUrl} onClose={() => setPreviewUrl(null)} />}
 
-      {/* Header */}
-      <div style={styles.topRow}>
-        <div style={styles.headerBtns}>
+      {/* Action buttons */}
+      <div className="flex justify-between items-start mb-4">
+        <div className="flex gap-2 mt-1.5 shrink-0">
           {!isReadOnly && (
             <button
-              style={styles.outlineBtn}
+              className="flex items-center gap-[5px] bg-c-dark-btn border-none rounded-[10px] py-[7px] px-2.5 cursor-pointer"
               onClick={() => { newFolderActiveRef.current = true; setShowNewFolder(true); setNewFolderName(""); }}
               title="Neuer Ordner"
             >
               <Plus size={15} color="var(--c-dark-btn-text)" />
-              <span style={styles.btnLabel}>Ordner</span>
+              <span className="text-xs font-semibold text-c-dark-btn-text">Ordner</span>
             </button>
           )}
           {!isReadOnly && (
             <button
-              style={styles.solidBtn}
+              className="flex items-center gap-[5px] bg-c-dark-btn border-none rounded-[10px] py-[7px] px-2.5 cursor-pointer"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
               title="Datei hochladen"
             >
               <Upload size={15} color="var(--c-dark-btn-text)" />
-              <span style={styles.btnLabelWhite}>Hochladen</span>
+              <span className="text-xs font-semibold text-c-dark-btn-text">Hochladen</span>
             </button>
           )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,image/*"
-            style={{ display: "none" }}
-            onChange={handleUpload}
-          />
+          <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,image/*" className="hidden" onChange={handleUpload} />
         </div>
       </div>
 
       {/* Breadcrumbs */}
       {crumbs.length > 1 && (
-        <div style={styles.breadcrumbs}>
+        <div className="flex items-center gap-1 flex-wrap mb-3">
           {crumbs.map((crumb, i) => (
             <React.Fragment key={crumb.id ?? "root"}>
               {i > 0 && <ChevronRight size={11} color="var(--c-text-4)" />}
               <button
-                style={{
-                  ...styles.crumb,
-                  color: i === crumbs.length - 1 ? "var(--c-text-1)" : "var(--c-text-3)",
-                  fontWeight: i === crumbs.length - 1 ? 700 : 500,
-                  cursor: i === crumbs.length - 1 ? "default" : "pointer",
-                }}
+                className={clsx(
+                  "bg-none border-none text-[13px] py-0.5 px-0",
+                  i === crumbs.length - 1
+                    ? "text-c-text-1 font-bold cursor-default"
+                    : "text-c-text-3 font-medium cursor-pointer"
+                )}
                 onClick={() => i < crumbs.length - 1 && goToCrumb(i)}
               >
                 {crumb.name}
@@ -345,10 +280,10 @@ export default function Dokumente({ navigate: _navigate }: DokumenteProps): Reac
 
       {/* New folder input */}
       {showNewFolder && (
-        <div style={styles.newFolderCard}>
+        <div className="flex items-center gap-2.5 bg-c-surface rounded-[14px] py-[11px] px-3.5 mb-2 border-[1.5px] border-[#2C2926]">
           <Folder size={17} color="#2C2926" />
           <input
-            style={styles.newFolderInput}
+            className="flex-1 border-none outline-none text-sm bg-transparent text-c-text-1"
             placeholder="Ordnername…"
             value={newFolderName}
             onChange={(e) => setNewFolderName(e.target.value)}
@@ -358,10 +293,10 @@ export default function Dokumente({ navigate: _navigate }: DokumenteProps): Reac
             }}
             autoFocus
           />
-          <button style={styles.smallBtn} onClick={() => { newFolderActiveRef.current = false; setShowNewFolder(false); }}>
+          <button className="bg-none border-none cursor-pointer p-1 flex items-center rounded-md" onClick={() => { newFolderActiveRef.current = false; setShowNewFolder(false); }}>
             <X size={14} color="var(--c-text-3)" />
           </button>
-          <button style={styles.smallBtn} onClick={handleCreateFolder} disabled={creating}>
+          <button className="bg-none border-none cursor-pointer p-1 flex items-center rounded-md" onClick={handleCreateFolder} disabled={creating}>
             <Check size={14} color="#2C2926" />
           </button>
         </div>
@@ -369,29 +304,27 @@ export default function Dokumente({ navigate: _navigate }: DokumenteProps): Reac
 
       {/* Upload progress */}
       {uploading && (
-        <div style={styles.progressWrap}>
-          <div style={{ ...styles.progressFill, width: `${uploadProgress}%` }} />
-          <span style={styles.progressText}>Hochladen… {Math.round(uploadProgress)}%</span>
+        <div className="relative h-[34px] bg-c-surface rounded-[10px] overflow-hidden mb-2.5 flex items-center">
+          <div className="absolute left-0 top-0 bottom-0 bg-[#2C2926] transition-[width] duration-200 ease-out" style={{ width: `${uploadProgress}%` }} />
+          <span className="relative text-xs font-semibold text-c-text-1 px-3.5">Hochladen… {Math.round(uploadProgress)}%</span>
         </div>
       )}
 
-      {/* Delete error */}
+      {/* Error banners */}
       {deleteError && (
-        <div style={styles.errorBox}>
+        <div className="flex items-center gap-2 bg-[#fef2f2] border border-[#fecaca] rounded-[10px] py-2.5 px-3 mb-2.5 text-[13px] text-[#dc2626]">
           <AlertTriangle size={14} color="#dc2626" />
           <span>{deleteError}</span>
-          <button style={styles.smallBtn} onClick={() => setDeleteError(null)}>
+          <button className="bg-none border-none cursor-pointer p-1 flex items-center rounded-md" onClick={() => setDeleteError(null)}>
             <X size={13} color="#dc2626" />
           </button>
         </div>
       )}
-
-      {/* Upload error */}
       {uploadError && (
-        <div style={styles.errorBox}>
+        <div className="flex items-center gap-2 bg-[#fef2f2] border border-[#fecaca] rounded-[10px] py-2.5 px-3 mb-2.5 text-[13px] text-[#dc2626]">
           <AlertTriangle size={14} color="#dc2626" />
           <span>{uploadError}</span>
-          <button style={styles.smallBtn} onClick={() => setUploadError(null)}>
+          <button className="bg-none border-none cursor-pointer p-1 flex items-center rounded-md" onClick={() => setUploadError(null)}>
             <X size={13} color="#dc2626" />
           </button>
         </div>
@@ -400,284 +333,79 @@ export default function Dokumente({ navigate: _navigate }: DokumenteProps): Reac
       {/* Animated content */}
       <div key={animKey} className={`page-${animDir}`}>
 
-      {/* Empty state */}
       {isEmpty && !showNewFolder ? (
-        <div style={styles.empty}>
+        <div className="flex flex-col items-center py-[60px] px-5 gap-2 text-center">
           <FolderOpen size={44} color="var(--c-border)" />
-          <p style={styles.emptyTitle}>Noch leer</p>
-          <p style={styles.emptyText}>
-            Erstelle einen Ordner oder lade eine Datei hoch.
-          </p>
+          <p className="text-base font-bold text-c-text-2 m-0">Noch leer</p>
+          <p className="text-[13px] text-c-text-3 max-w-[240px] m-0">Erstelle einen Ordner oder lade eine Datei hoch.</p>
         </div>
       ) : (
-        <div style={styles.list}>
+        <div className="flex flex-col gap-2.5">
 
-          {/* Lager-verknüpfte Ordner (nur im Root sichtbar, keine eigenen doppelt) */}
+          {/* Space-linked folders */}
           {visibleSpaceFolders.length > 0 && (
             <>
-              <div style={styles.sectionLabel}>Lager-Ordner</div>
+              <div className="text-[11px] font-bold text-c-text-3 tracking-[0.06em] pt-2 pb-1 uppercase">Lager-Ordner</div>
               {visibleSpaceFolders.map((sf) => (
-                <div key={sf.id} style={styles.row}>
-                  <button style={styles.rowMain} onClick={() => enterFolder(sf)}>
-                    <div style={{ ...styles.folderIconBox, background: "var(--c-accent-bg)" }}>
+                <div key={sf.id} className="flex items-center bg-c-surface rounded-[14px] overflow-hidden min-h-[56px]">
+                  <button className="flex-1 flex items-center gap-3 py-3 px-3.5 bg-none border-none cursor-pointer text-left min-w-0" onClick={() => enterFolder(sf)}>
+                    <div className="w-[38px] h-[38px] rounded-[10px] flex items-center justify-center shrink-0" style={{ background: "var(--c-accent-bg)" }}>
                       <FolderOpen size={19} color="#2C2926" />
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column" as const, flex: 1, minWidth: 0 }}>
-                      <span style={styles.rowName}>{sf.name}</span>
-                      <span style={{ fontSize: 11, color: "var(--c-text-3)" }}>{sf.space_name}</span>
+                    <div className="flex flex-col flex-1 min-w-0">
+                      <span className="flex-1 text-sm font-semibold text-c-text-1 overflow-hidden text-ellipsis whitespace-nowrap">{sf.name}</span>
+                      <span className="text-[11px] text-c-text-3">{sf.space_name}</span>
                     </div>
-                    <ChevronRight size={15} color="var(--c-text-4)" style={{ flexShrink: 0 }} />
+                    <ChevronRight size={15} color="var(--c-text-4)" className="shrink-0" />
                   </button>
                 </div>
               ))}
-              {(folders.length > 0 || files.length > 0) && <div style={styles.divider} />}
+              {(folders.length > 0 || files.length > 0) && <div className="h-px bg-c-border-2 my-1" />}
             </>
           )}
 
           {/* Folders */}
           {folders.map((folder) => (
-            <div key={folder.id} style={styles.row}>
-              {editingFolderId === folder.id ? (
-                /* Rename mode */
-                <div style={styles.renameRow}>
-                  <Folder size={17} color="#2C2926" style={{ flexShrink: 0 }} />
-                  <input
-                    style={styles.renameInput}
-                    value={editFolderName}
-                    onChange={(e) => setEditFolderName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleRename();
-                      if (e.key === "Escape") setEditingFolderId(null);
-                    }}
-                    autoFocus
-                  />
-                  <button style={styles.smallBtn} onClick={() => setEditingFolderId(null)}>
-                    <X size={14} color="var(--c-text-3)" />
-                  </button>
-                  <button style={styles.smallBtn} onClick={handleRename}>
-                    <Check size={14} color="#22c55e" />
-                  </button>
-                </div>
-              ) : (
-                /* Normal folder row */
-                <>
-                  <button style={styles.rowMain} onClick={() => enterFolder(folder)}>
-                    <div style={styles.folderIconBox}>
-                      <Folder size={19} color="#2C2926" />
-                    </div>
-                    <span style={styles.rowName}>{folder.name}</span>
-                    <ChevronRight size={15} color="var(--c-text-4)" style={{ flexShrink: 0 }} />
-                  </button>
-                  {!isReadOnly && (
-                    <div style={styles.rowActions}>
-                      <button
-                        style={styles.actionBtn}
-                        onClick={() => startRename(folder)}
-                        title="Umbenennen"
-                      >
-                        <Pencil size={14} color="var(--c-text-3)" />
-                      </button>
-                      <button
-                        style={{
-                          ...styles.actionBtn,
-                          background: deleteFolderConfirm === folder.id ? "#fee2e2" : "none",
-                        }}
-                        onClick={() => handleDeleteFolder(folder)}
-                        title="Löschen"
-                      >
-                        <Trash2 size={14} color={deleteFolderConfirm === folder.id ? "#ef4444" : "var(--c-text-4)"} />
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
+            <FolderRow
+              key={folder.id}
+              folder={folder}
+              isReadOnly={isReadOnly}
+              editingFolderId={editingFolderId}
+              editFolderName={editFolderName}
+              deleteFolderConfirm={deleteFolderConfirm}
+              onEnter={enterFolder}
+              onStartRename={startRename}
+              onEditNameChange={setEditFolderName}
+              onRename={handleRename}
+              onCancelRename={() => setEditingFolderId(null)}
+              onDelete={handleDeleteFolder}
+            />
           ))}
 
-          {/* Divider between folders and files */}
-          {folders.length > 0 && files.length > 0 && (
-            <div style={styles.divider} />
-          )}
+          {folders.length > 0 && files.length > 0 && <div className="h-px bg-c-border-2 my-1" />}
 
           {/* Files */}
           {files.map((file) => (
-            <div key={file.id} style={styles.row}>
-              <button
-                style={styles.rowMain}
-                onClick={() => handleOpenFile(file)}
-              >
-                <div style={{ ...styles.fileIconBox, background: fileIconBg(file.mimeType) }}>
-                  <FileTypeIcon mimeType={file.mimeType} />
-                </div>
-                <div style={styles.fileInfo}>
-                  <span style={styles.rowName}>{file.name}</span>
-                  <span style={styles.fileMeta}>{formatSize(file.size)}</span>
-                </div>
-              </button>
-              {!isReadOnly && (
-                <div style={styles.rowActions}>
-                  <button
-                    style={{
-                      ...styles.actionBtn,
-                      background: deleteFileConfirm === file.id ? "#fee2e2" : "none",
-                    }}
-                    onClick={() => handleDeleteFile(file)}
-                    title="Löschen"
-                  >
-                    <Trash2 size={14} color={deleteFileConfirm === file.id ? "#ef4444" : "var(--c-text-4)"} />
-                  </button>
-                </div>
-              )}
-            </div>
+            <FileRow
+              key={file.id}
+              file={file}
+              isReadOnly={isReadOnly}
+              deleteFileConfirm={deleteFileConfirm}
+              onOpen={handleOpenFile}
+              onDelete={handleDeleteFile}
+            />
           ))}
         </div>
       )}
 
-      {/* Back button */}
       {crumbs.length > 1 && (
-        <button style={styles.backBtn} onClick={() => goToCrumb(crumbs.length - 2)}>
+        <button className="flex items-center gap-1.5 bg-none border-none cursor-pointer text-[13px] font-semibold text-c-text-2 mt-5 p-0" onClick={() => goToCrumb(crumbs.length - 2)}>
           <ChevronLeft size={15} color="var(--c-text-2)" />
           Zurück zu „{crumbs[crumbs.length - 2].name}"
         </button>
       )}
 
-      </div>{/* end animated content */}
+      </div>
     </div>
   );
 }
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
-const styles: Record<string, CSSProperties> = {
-  container: { padding: "20px 16px", width: "100%", boxSizing: "border-box" },
-
-  topRow: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 },
-  title: { fontSize: 28, fontWeight: 800, color: "var(--c-text-1)", margin: 0 },
-  subtitle: { fontSize: 14, color: "var(--c-text-3)", marginTop: 4, marginBottom: 16 },
-
-  headerBtns: { display: "flex", gap: 8, marginTop: 6, flexShrink: 0 },
-  outlineBtn: { display: "flex", alignItems: "center", gap: 5, background: "var(--c-dark-btn)", border: "none", borderRadius: 10, padding: "7px 10px", cursor: "pointer" },
-  solidBtn: { display: "flex", alignItems: "center", gap: 5, background: "var(--c-dark-btn)", border: "none", borderRadius: 10, padding: "7px 10px", cursor: "pointer" },
-  btnLabel: { fontSize: 12, fontWeight: 600, color: "var(--c-dark-btn-text)" },
-  btnLabelWhite: { fontSize: 12, fontWeight: 600, color: "var(--c-dark-btn-text)" },
-
-  breadcrumbs: { display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", marginBottom: 12 },
-  crumb: { background: "none", border: "none", fontSize: 13, padding: "2px 0" },
-
-  newFolderCard: {
-    display: "flex", alignItems: "center", gap: 10,
-    background: "var(--c-surface)", borderRadius: 14, padding: "11px 14px",
-    marginBottom: 8,
-    border: "1.5px solid #2C2926",
-  },
-  newFolderInput: {
-    flex: 1, border: "none", outline: "none", fontSize: 14,
-    background: "transparent", color: "var(--c-text-1)",
-  },
-  smallBtn: {
-    background: "none", border: "none", cursor: "pointer",
-    padding: 4, display: "flex", alignItems: "center", borderRadius: 6,
-  },
-
-  progressWrap: {
-    position: "relative", height: 34, background: "var(--c-surface)",
-    borderRadius: 10, overflow: "hidden", marginBottom: 10,
-    display: "flex", alignItems: "center",
-  },
-  progressFill: {
-    position: "absolute", left: 0, top: 0, bottom: 0,
-    background: "linear-gradient(90deg, #2C2926 0%, #2C2926 100%)",
-    transition: "width 0.2s ease",
-  },
-  progressText: {
-    position: "relative", fontSize: 12, fontWeight: 600,
-    color: "var(--c-text-1)", padding: "0 14px",
-  },
-
-  errorBox: {
-    display: "flex", alignItems: "center", gap: 8,
-    background: "#fef2f2", border: "1px solid #fecaca",
-    borderRadius: 10, padding: "10px 12px", marginBottom: 10,
-    fontSize: 13, color: "#dc2626",
-  },
-
-  empty: {
-    display: "flex", flexDirection: "column", alignItems: "center",
-    padding: "60px 20px", gap: 8, textAlign: "center",
-  },
-  emptyTitle: { fontSize: 16, fontWeight: 700, color: "var(--c-text-2)", margin: 0 },
-  emptyText: { fontSize: 13, color: "var(--c-text-3)", maxWidth: 240, margin: 0 },
-
-  list: { display: "flex", flexDirection: "column", gap: 10 },
-
-  row: {
-    display: "flex", alignItems: "center",
-    background: "var(--c-surface)", borderRadius: 14,
-    overflow: "hidden",
-    minHeight: 56,
-  },
-  rowMain: {
-    flex: 1, display: "flex", alignItems: "center", gap: 12,
-    padding: "12px 14px", background: "none", border: "none",
-    cursor: "pointer", textAlign: "left", minWidth: 0,
-  },
-  rowName: {
-    flex: 1, fontSize: 14, fontWeight: 600, color: "var(--c-text-1)",
-    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-  },
-  rowActions: { display: "flex", alignItems: "center", paddingRight: 4, gap: 2, flexShrink: 0 },
-  actionBtn: {
-    background: "none", border: "none", cursor: "pointer",
-    padding: 8, display: "flex", alignItems: "center", borderRadius: 8,
-    transition: "background 0.15s",
-  },
-
-  folderIconBox: {
-    width: 38, height: 38, borderRadius: 10,
-    background: "var(--c-accent-bg)",
-    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-  },
-  fileIconBox: {
-    width: 38, height: 38, borderRadius: 10,
-    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-  },
-  fileInfo: { flex: 1, display: "flex", flexDirection: "column", gap: 2, minWidth: 0 },
-  fileMeta: { fontSize: 11, color: "var(--c-text-3)" },
-
-  divider: { height: 1, background: "var(--c-border-2)", margin: "4px 0" },
-  sectionLabel: { fontSize: 11, fontWeight: 700, color: "var(--c-text-3)", letterSpacing: "0.06em", padding: "8px 0 4px", textTransform: "uppercase" as const },
-
-  renameRow: {
-    flex: 1, display: "flex", alignItems: "center", gap: 10,
-    padding: "10px 14px", border: "1.5px solid #2C2926", borderRadius: 14,
-    background: "var(--c-surface)",
-  },
-  renameInput: {
-    flex: 1, border: "none", outline: "none", fontSize: 14,
-    background: "transparent", color: "var(--c-text-1)",
-  },
-
-  backBtn: {
-    display: "flex", alignItems: "center", gap: 6,
-    background: "none", border: "none", cursor: "pointer",
-    fontSize: 13, fontWeight: 600, color: "var(--c-text-2)",
-    marginTop: 20, padding: 0,
-  },
-
-  previewOverlay: {
-    position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)",
-    zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center",
-    padding: 20,
-  },
-  previewClose: {
-    position: "absolute", top: 20, right: 20,
-    background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 10,
-    width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center",
-    cursor: "pointer",
-  },
-  previewImg: {
-    maxWidth: "100%", maxHeight: "80vh",
-    borderRadius: 12,
-    objectFit: "contain",
-  },
-};

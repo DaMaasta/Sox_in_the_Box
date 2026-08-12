@@ -1,56 +1,19 @@
 import { api } from '../config/api';
-import type { Space } from '../types';
+import type { Space, RawSpace } from '../types';
+import { createCachedStore } from '../utils/cachedStore';
+import { reportError } from '../utils/errorBus';
 
-// ── Cache (stale-while-revalidate, persisted to localStorage) ─────────────────
-const cache = new Map<string, Space[]>();
-const LS = 'kistle_sc2_';
-
-function cacheGet(key: string): Space[] | null {
-  if (cache.has(key)) return cache.get(key)!;
-  try {
-    const raw = localStorage.getItem(LS + key);
-    if (!raw) return null;
-    const parsed = (JSON.parse(raw) as Space[]).map(deserializeSpace);
-    cache.set(key, parsed);
-    return parsed;
-  } catch { return null; }
+function deserializeSpace(s: RawSpace): Space {
+  return { ...s, createdAt: new Date(s.createdAt), updatedAt: new Date(s.updatedAt) };
 }
 
-function cacheSet(key: string, data: Space[]): void {
-  cache.set(key, data);
-  try { localStorage.setItem(LS + key, JSON.stringify(data)); } catch { /* quota */ }
-}
+const store = createCachedStore<RawSpace, Space>({
+  lsPrefix: 'kistle_sc2_',
+  deserialize: deserializeSpace,
+});
 
-// ── Optimistic state ──────────────────────────────────────────────────────────
-const pendingUpdates = new Map<string, Partial<Space>>();
-const pendingCreates = new Map<string, Space>();
-const pendingDeletes = new Set<string>();
-const activeLoaders  = new Set<() => void>();
-
-function triggerReload() {
-  activeLoaders.forEach(load => load());
-}
-
-function applyOptimistic(spaces: Space[]): Space[] {
-  const result = spaces
-    .filter(s => !pendingDeletes.has(s.id))
-    .map(s => {
-      const upd = pendingUpdates.get(s.id);
-      return upd ? { ...s, ...upd } : s;
-    });
-  pendingCreates.forEach(s => {
-    if (!result.find(r => r.id === s.id)) result.unshift(s);
-  });
-  return result;
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 export function generateAccessCode(length: number): string {
   return Array.from({ length }, () => String(Math.floor(Math.random() * 10))).join('');
-}
-
-function deserializeSpace(s: Space): Space {
-  return { ...s, createdAt: new Date(s.createdAt), updatedAt: new Date(s.updatedAt) };
 }
 
 const now = () => new Date();
@@ -60,92 +23,46 @@ export function subscribeToUserSpaces(
   _userId: string,
   callback: (spaces: Space[]) => void
 ): () => void {
-  let active = true;
-  const cacheKey = 'user';
-  const cached = cacheGet(cacheKey);
-  if (cached) callback(applyOptimistic(cached));
-  async function load() {
-    try {
-      const spaces = await api.get<Space[]>('/spaces');
-      const deserialized = spaces.map(deserializeSpace);
-      cacheSet(cacheKey, deserialized);
-      if (active) callback(applyOptimistic(deserialized));
-    } catch { /* ignore */ }
-  }
-  activeLoaders.add(load);
-  load();
-  const interval = setInterval(load, 6000);
-  return () => { active = false; clearInterval(interval); activeLoaders.delete(load); };
+  return store.subscribe('user', () => api.get<RawSpace[]>('/spaces'), 'Lager konnten nicht geladen werden', callback);
 }
 
 export function subscribeToSpace(
   spaceId: string,
   callback: (space: Space | null) => void
 ): () => void {
-  let active = true;
-  const cacheKey = `space:${spaceId}`;
-  const cachedArr = cacheGet(cacheKey);
-  if (cachedArr?.[0]) {
-    const upd = pendingUpdates.get(spaceId);
-    callback(upd ? { ...cachedArr[0], ...upd } : cachedArr[0]);
-  }
-  async function load() {
-    const space = await getSpace(spaceId);
-    if (active) {
-      if (!space) { callback(null); return; }
-      cacheSet(cacheKey, [space]);
-      const upd = pendingUpdates.get(spaceId);
-      callback(upd ? { ...space, ...upd } : space);
-    }
-  }
-  activeLoaders.add(load);
-  load();
-  const interval = setInterval(load, 6000);
-  return () => { active = false; clearInterval(interval); activeLoaders.delete(load); };
+  return store.subscribeSingle(
+    `space:${spaceId}`,
+    async () => {
+      try { return await api.get<RawSpace>(`/spaces/${spaceId}`); }
+      catch { return null; }
+    },
+    'Lager konnte nicht geladen werden',
+    callback
+  );
 }
 
 export function subscribeToChildSpaces(
   parentId: string,
   callback: (spaces: Space[]) => void
 ): () => void {
-  let active = true;
-  const cacheKey = `children:${parentId}`;
-  const cached = cacheGet(cacheKey);
-  if (cached) callback(applyOptimistic(cached));
-  async function load() {
-    try {
-      const spaces = await api.get<Space[]>(`/spaces?parentId=${parentId}`);
-      const deserialized = spaces.map(deserializeSpace);
-      cacheSet(cacheKey, deserialized);
-      if (active) callback(applyOptimistic(deserialized));
-    } catch { /* ignore */ }
-  }
-  activeLoaders.add(load);
-  load();
-  const interval = setInterval(load, 6000);
-  return () => { active = false; clearInterval(interval); activeLoaders.delete(load); };
+  return store.subscribe(
+    `children:${parentId}`,
+    () => api.get<RawSpace[]>(`/spaces?parentId=${parentId}`),
+    'Boxen konnten nicht geladen werden',
+    callback
+  );
 }
 
 export function subscribeToSpacesByParentIds(
   parentIds: string[],
   callback: (spaces: Space[]) => void
 ): () => void {
-  let active = true;
-  const cacheKey = `parents:${parentIds.sort().join(',')}`;
-  const cached = cacheGet(cacheKey);
-  if (cached) callback(applyOptimistic(cached));
-  async function load() {
-    try {
-      const all = await Promise.all(parentIds.map(id => api.get<Space[]>(`/spaces?parentId=${id}`)));
-      const deserialized = all.flat().map(deserializeSpace);
-      cacheSet(cacheKey, deserialized);
-      if (active) callback(applyOptimistic(deserialized));
-    } catch { /* ignore */ }
-  }
-  activeLoaders.add(load);
-  load();
-  const interval = setInterval(load, 6000);
-  return () => { active = false; clearInterval(interval); activeLoaders.delete(load); };
+  return store.subscribe(
+    `parents:${parentIds.sort().join(',')}`,
+    () => api.get<RawSpace[]>(`/spaces?parentIds=${parentIds.join(',')}`),
+    'Daten konnten nicht geladen werden',
+    callback
+  );
 }
 
 // ── Mutations ─────────────────────────────────────────────────────────────────
@@ -163,50 +80,48 @@ export async function createSpace(
     color: '#2C2926', isGroup: false, parentId: null,
     ...data,
   };
-  pendingCreates.set(id, optimistic);
-  triggerReload();
+  store.setCreate(id, optimistic);
   try {
     await api.post('/spaces', { id, ...data });
     return id;
   } catch (err) {
-    pendingCreates.delete(id);
-    triggerReload();
+    reportError('Lager konnte nicht erstellt werden');
     throw err;
   } finally {
-    pendingCreates.delete(id);
+    store.clearCreate(id);
+    store.triggerReload();
   }
 }
 
 export async function updateSpace(spaceId: string, data: Partial<Space>): Promise<void> {
-  const previous = pendingUpdates.get(spaceId);
-  pendingUpdates.set(spaceId, { ...previous, ...data });
-  triggerReload();
+  store.setUpdate(spaceId, data);
   try {
     await api.put(`/spaces/${spaceId}`, data);
   } catch (err) {
-    pendingUpdates.delete(spaceId);
-    triggerReload();
+    reportError('Änderung konnte nicht gespeichert werden');
     throw err;
   } finally {
-    pendingUpdates.delete(spaceId);
+    store.clearUpdate(spaceId);
+    store.triggerReload();
   }
 }
 
 export async function deleteSpace(spaceId: string): Promise<void> {
-  pendingDeletes.add(spaceId);
-  triggerReload();
+  store.setDelete(spaceId);
   try {
     await api.delete(`/spaces/${spaceId}`);
   } catch (err) {
-    pendingDeletes.delete(spaceId);
-    triggerReload();
+    reportError('Lager konnte nicht gelöscht werden');
     throw err;
+  } finally {
+    store.clearDelete(spaceId);
+    store.triggerReload();
   }
 }
 
 export async function getSpace(spaceId: string): Promise<Space | null> {
   try {
-    const space = await api.get<Space>(`/spaces/${spaceId}`);
+    const space = await api.get<RawSpace>(`/spaces/${spaceId}`);
     return deserializeSpace(space);
   } catch {
     return null;

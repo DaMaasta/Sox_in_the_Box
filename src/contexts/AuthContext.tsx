@@ -3,9 +3,7 @@ import type { ReactNode } from 'react';
 import { api, setToken, clearToken, isLoggedIn } from '../config/api';
 
 export interface AppUser {
-  id: string;
   uid: string;
-  userId: string;
   email: string;
   displayName: string;
   photoURL: string;
@@ -27,7 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!isLoggedIn()) { setLoading(false); return; }
     try {
       const data = await api.get<{ userId: string; email: string; displayName: string; photoURL: string }>('/auth/me');
-      setUser({ id: data.userId, uid: data.userId, userId: data.userId, email: data.email, displayName: data.displayName, photoURL: data.photoURL ?? '' });
+      setUser({ uid: data.userId, email: data.email, displayName: data.displayName, photoURL: data.photoURL ?? '' });
     } catch {
       clearToken();
     } finally {
@@ -46,11 +44,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   return useContext(AuthContext);
-}
-
-// Intern genutzt von auth.service.ts
-export function _setAuthUser(_user: AppUser | null) {
-  // Dieser Export wird nur von auth.service verwendet
 }
 
 export { setToken };

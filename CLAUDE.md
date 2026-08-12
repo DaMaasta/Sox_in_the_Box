@@ -18,7 +18,7 @@ Inventar- und Lagerverwaltungs-PWA (React/TypeScript). Nutzer verwalten hierarch
 | Container | Port | Wichtige Pfade |
 |---|---|---|
 | `nginx` | 80/443 | `/opt/docker/nginx/conf.d/kistle.conf` |
-| `postgres:16` | 5432 | DB: `webapp`, User: `admin`, PW: `sicherespasswort` |
+| `postgres:16` | 5432 | DB: `webapp`, Zugangsdaten ausschließlich aus der Server-`.env` |
 | `webapp` (Node.js/Express) | 3000 | `/opt/docker/webapp/.env` |
 | `cloudflared` | — | Tunnel: `heaven-tunnel` |
 | `homeassistant` | 8123 | — |
@@ -26,8 +26,10 @@ Inventar- und Lagerverwaltungs-PWA (React/TypeScript). Nutzer verwalten hierarch
 
 ### Häufige Server-Befehle
 ```bash
-# Backend neu bauen
+# Backend neu bauen (vorher DB-Dump anlegen)
 cd ~/kistle/server
+npm test
+docker tag kistle-webapp kistle-webapp:before-deploy
 docker build -t kistle-webapp .
 cd /opt/docker/webapp
 sudo docker compose up -d --force-recreate
@@ -73,9 +75,25 @@ DEPLOY_PATH=/mnt/data/www
 
 | | |
 |---|---|
+| **Lokaler Produktionsstand** | `server-production/` (CommonJS, maßgeblich für Deployments) |
+| **Alter lokaler Stand** | `server/` (TypeScript, nicht mit Produktion synchron) |
 | **Pfad auf Server** | `/home/damaasta/kistle/server/` |
-| **Auth** | Google OAuth `access_token` → Google userinfo → JWT (localStorage: `kistle_token`) |
+| **Auth** | E-Mail/Passwort oder Google-ID-Token → JWT, 7 Tage (localStorage: `kistle_token`) |
 | **Routes** | `/api/auth`, `/api/spaces`, `/api/products`, `/api/bookings`, `/api/documents`, `/api/notifications` |
+
+### Produktions-Sicherheitsmodell
+- Leserechte: `viewer`, `editor`, `admin`; Kind-Boxen erben die Gruppenrolle.
+- Schreibrechte für Lagerbestand: `editor`, `admin`.
+- Mitglieder- und Rollenverwaltung: nur `admin` bzw. Besitzer.
+- Nuki: nur Editor/Admin der in `NUKI_SPACE_ID` konfigurierten Gruppe.
+- Autorisierungshelfer liegen zentral in `server-production/authorization.js`.
+- Vor Backend-Deployments immer `npm test` in `server-production/` ausführen.
+
+### Backups
+- Täglicher PostgreSQL-Dump um 02:15 UTC via Benutzer-Crontab.
+- Ziel: `/mnt/data/backups/kistle-postgres/` auf separatem Datenträger.
+- Format: PostgreSQL Custom Format; Aufbewahrung: 30 Tage.
+- Manuell: `/home/damaasta/kistle/server/ops/backup-postgres.sh`.
 
 ### Datenbank-Tabellen
 `users`, `spaces`, `space_members`, `products`, `bookings`, `booking_items`, `folders`, `documents`, `notifications`, `lock_errors`
@@ -108,7 +126,7 @@ DEPLOY_PATH=/mnt/data/www
 
 ### Service-Schicht
 - `src/config/api.ts` — zentraler HTTP-Client mit JWT-Header
-- Polling statt Realtime (6s Intervall in `spaces.service.ts`)
+- WebSocket-Invalidierung über `/ws`; 30-Sekunden-Polling als Fallback
 - `src/services/` — auth, spaces, products, bookings, notifications, documents, mqtt
 
 ### Contexts

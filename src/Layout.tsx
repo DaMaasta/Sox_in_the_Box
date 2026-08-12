@@ -45,6 +45,7 @@ export default function Layout({ children, currentPageName, navigate }: LayoutPr
   const [bellRinging, setBellRinging] = useState(false);
   const bellRef = useRef<HTMLButtonElement>(null);
   const headerRef = useRef<HTMLElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
   const pillTitleRef = useRef<HTMLDivElement>(null);
   const [headerHeight, setHeaderHeight] = useState(64);
 
@@ -69,7 +70,7 @@ export default function Layout({ children, currentPageName, navigate }: LayoutPr
     : Math.min(62 + (headerState?.title?.length ?? 0) * 10, 280);
 
   useEffect(() => {
-    window.scrollTo(0, 0);
+    if (mainRef.current) mainRef.current.scrollTop = 0;
   }, [currentPageName]);
 
   useLayoutEffect(() => {
@@ -172,7 +173,7 @@ export default function Layout({ children, currentPageName, navigate }: LayoutPr
       </header>
 
       {/* Content */}
-      <main className="app-main" style={{ marginTop: headerHeight }}>
+      <main ref={mainRef} className="app-main" style={{ marginTop: headerHeight }}>
         {children}
       </main>
 

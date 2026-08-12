@@ -27,6 +27,30 @@ const store = createCachedStore<RawProduct, Product>({
 
 const now = () => new Date();
 
+export interface ProductQuantityUpdate {
+  id: string;
+  quantity: number;
+  lastModifiedAt?: string;
+}
+
+export function applyProductQuantityUpdates(updates: ProductQuantityUpdate[]): void {
+  if (updates.length === 0) {
+    store.invalidateCache();
+    return;
+  }
+  store.patchCachedItems(updates.map((update) => ({
+    id: update.id,
+    data: {
+      quantity: update.quantity,
+      lastModifiedAt: update.lastModifiedAt ? new Date(update.lastModifiedAt) : now(),
+    },
+  })));
+}
+
+export function invalidateProductCache(): void {
+  store.invalidateCache();
+}
+
 // Fotos landen nicht in localStorage (siehe stripForPersist), sondern separat in
 // IndexedDB. Frisch vom Netzwerk geladene Fotos werden dort opportunistisch abgelegt ...
 function cacheImagesFrom(raw: RawProduct[]): void {

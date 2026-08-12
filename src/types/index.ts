@@ -78,6 +78,7 @@ export interface BookingItem {
   imageUrl: string | null;
   boxId: string;
   boxName: string;
+  boxNumber?: number | null;
   parentId: string | null;
   parentName: string;
 }
@@ -94,6 +95,8 @@ export interface Booking {
   originalBookingId?: string;
   isReturned?: boolean;
 }
+
+export type RawBooking = Omit<Booking, 'createdAt'> & { createdAt: string };
 
 export interface UserProfile {
   uid: string;

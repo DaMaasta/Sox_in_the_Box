@@ -8,9 +8,19 @@ import { subscribeToUserSpaces, subscribeToSpacesByParentIds } from "../services
 import { useAuth } from "../contexts/AuthContext";
 import { useCart } from "../contexts/CartContext";
 import QuantityModal from "../components/QuantityModal";
+import { useThumbnail } from "../utils/thumbnail";
 
 interface SearchPageProps {
   navigate: NavigateFn;
+}
+
+// Rendert eine kleine, vorskalierte Version des Fotos statt des vollen (bis zu 600x600px)
+// Base64-Bilds — sonst muss der Browser beim Scrollen durch viele Treffer jedes volle
+// Foto dekodieren, nur um es auf 64x64 zu quetschen, was spürbar ruckelt.
+function ResultThumbnail({ imageUrl, name }: { imageUrl: string | null; name: string }): React.ReactElement {
+  const thumb = useThumbnail(imageUrl, 96);
+  if (imageUrl && thumb) return <img src={thumb} alt={name} style={styles.itemImgEl} />;
+  return <span style={styles.itemInitial}>{name[0]?.toUpperCase() ?? "?"}</span>;
 }
 
 const COLOR_NAMES: Record<string, string> = {
@@ -28,6 +38,7 @@ export default function SearchPage({ navigate }: SearchPageProps): React.ReactEl
   const { user } = useAuth();
   const { addToCart, items: cartItems } = useCart();
   const [query, setQuery]     = useState("");
+  const [focused, setFocused] = useState(false);
   const [userGroups, setUserGroups] = useState<Space[]>([]);
   const [boxes, setBoxes]     = useState<Space[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -79,6 +90,26 @@ export default function SearchPage({ navigate }: SearchPageProps): React.ReactEl
     });
   }, [q, products, spaceMap]);
 
+  // Autocomplete: Artikelnamen, die mit dem Getippten beginnen (Präfix-Match statt
+  // des breiteren Substring-Matches von `results`), dedupliziert, max. 6 Vorschläge.
+  const suggestions = useMemo(() => {
+    if (q.length === 0) return [];
+    const seen = new Set<string>();
+    const matches: string[] = [];
+    for (const p of products) {
+      if (p.quantity <= 0) continue;
+      const key = p.name.toLowerCase();
+      if (!key.startsWith(q) || seen.has(key)) continue;
+      seen.add(key);
+      matches.push(p.name);
+      if (matches.length >= 6) break;
+    }
+    return matches;
+  }, [q, products]);
+
+  const showSuggestions = focused && suggestions.length > 0 &&
+    !(suggestions.length === 1 && suggestions[0].toLowerCase() === q);
+
   return (
     <div style={styles.container}>
       <div style={styles.stickyHeader}>
@@ -90,10 +121,28 @@ export default function SearchPage({ navigate }: SearchPageProps): React.ReactEl
             placeholder="Name, Farbe oder Beschreibung..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setTimeout(() => setFocused(false), 150)}
             inputMode="search"
             autoComplete="off"
           />
         </div>
+
+        {showSuggestions && (
+          <div style={styles.suggestions}>
+            {suggestions.map((name, idx) => (
+              <button
+                key={name}
+                style={{ ...styles.suggestionItem, borderBottom: idx < suggestions.length - 1 ? "1px solid var(--c-border-2)" : "none" }}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => { setQuery(name); setFocused(false); }}
+              >
+                <Search size={13} color="var(--c-text-3)" />
+                <span>{name}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {q.length === 0 && results.length === 0 ? (
@@ -116,10 +165,7 @@ export default function SearchPage({ navigate }: SearchPageProps): React.ReactEl
               <div key={p.id} style={{ ...styles.card, cursor: "pointer" }} onClick={() => box && navigate("ItemView", { product: p, box, parent, from: "SearchPage" })}>
                 <div style={styles.item}>
                   <div style={styles.itemImg}>
-                    {p.imageUrl
-                      ? <img src={p.imageUrl} alt={p.name} style={styles.itemImgEl} />
-                      : <span style={styles.itemInitial}>{p.name[0]?.toUpperCase() ?? "?"}</span>
-                    }
+                    <ResultThumbnail imageUrl={p.imageUrl} name={p.name} />
                   </div>
                   <div style={styles.itemInfo}>
                     <div style={styles.itemName}>{p.name}</div>
@@ -185,16 +231,28 @@ export default function SearchPage({ navigate }: SearchPageProps): React.ReactEl
 const styles: Record<string, CSSProperties> = {
   container: { padding: "0 0 0 0" },
   stickyHeader: {
-    position: "sticky", top: "var(--header-height, 64px)", zIndex: 10,
+    position: "sticky", top: 0, zIndex: 10,
     background: "linear-gradient(to bottom, var(--c-bg) 70%, transparent 100%)",
     padding: "12px 16px 18px",
   },
   searchBox: {
     display: "flex", alignItems: "center", gap: 10,
-    background: "var(--c-surface)", border: "1.5px solid var(--c-border)", borderRadius: 14,
+    background: "var(--c-surface)", border: "none", borderRadius: 9999,
     padding: "0 16px",
   },
   input: { flex: 1, border: "none", outline: "none", fontSize: 16, color: "var(--c-text-1)", background: "transparent", padding: "13px 0" },
+  suggestions: {
+    display: "flex", flexDirection: "column",
+    background: "var(--c-surface)", borderRadius: 14,
+    marginTop: 6, overflow: "hidden",
+    boxShadow: "0 8px 20px rgba(0,0,0,0.1)",
+  },
+  suggestionItem: {
+    display: "flex", alignItems: "center", gap: 8,
+    padding: "11px 16px", background: "transparent", border: "none",
+    fontSize: 13, fontWeight: 500, color: "var(--c-text-1)",
+    textAlign: "left" as const, cursor: "pointer",
+  },
   hint: { textAlign: "center", padding: "60px 20px", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 },
   hintText: { fontSize: 14, color: "var(--c-text-3)" },
   list: { display: "flex", flexDirection: "column", gap: 8, padding: "0 16px 8px" },

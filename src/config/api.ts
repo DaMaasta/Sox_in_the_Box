@@ -35,21 +35,33 @@ async function request<T>(
   if (token) headers['Authorization'] = `Bearer ${token}`;
   if (body && !formData) headers['Content-Type'] = 'application/json';
 
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method,
-    headers,
-    body: formData ?? (body ? JSON.stringify(body) : undefined),
-  });
+  const maxAttempts = method === 'GET' ? 3 : 1;
 
-  if (res.status === 401) {
-    clearToken();
-    window.location.reload();
-    throw new ApiError(401, 'Session abgelaufen');
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const res = await fetch(`${BASE_URL}${path}`, {
+        method,
+        headers,
+        body: formData ?? (body ? JSON.stringify(body) : undefined),
+      });
+
+      if (res.status === 401) {
+        clearToken();
+        window.location.reload();
+        throw new ApiError(401, 'Session abgelaufen');
+      }
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new ApiError(res.status, data.error ?? `HTTP ${res.status}`);
+      return data as T;
+    } catch (err) {
+      if (attempt === maxAttempts - 1) throw err;
+      if (err instanceof ApiError && err.status < 500) throw err;
+      await new Promise(r => setTimeout(r, 1000 * 2 ** attempt));
+    }
   }
 
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(res.status, data.error ?? `HTTP ${res.status}`);
-  return data as T;
+  throw new Error('unreachable');
 }
 
 async function fetchBlob(path: string): Promise<Blob> {

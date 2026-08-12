@@ -31,6 +31,7 @@ import {
   deleteProduct,
   updateQuantity,
   uploadProductImage,
+  applyProductQuantityUpdates,
 } from '../services/products.service';
 import { reportError } from '../utils/errorBus';
 
@@ -106,6 +107,23 @@ describe('products.service', () => {
       const unsub = subscribeToSpaceProducts('s1', vi.fn());
       expect(typeof unsub).toBe('function');
       unsub();
+    });
+
+    it('patches cached quantities immediately after a booking', async () => {
+      vi.mocked(api.get).mockResolvedValue([
+        makeProduct({ id: 'p-cache-patch', spaceId: 's-cache-patch', quantity: 5 }),
+      ]);
+      const firstCallback = vi.fn();
+      const unsubscribeFirst = subscribeToSpaceProducts('s-cache-patch', firstCallback);
+      await vi.waitFor(() => expect(firstCallback).toHaveBeenCalled());
+
+      applyProductQuantityUpdates([{ id: 'p-cache-patch', quantity: 0 }]);
+
+      const cachedCallback = vi.fn();
+      const unsubscribeSecond = subscribeToSpaceProducts('s-cache-patch', cachedCallback);
+      expect(cachedCallback.mock.calls[0][0][0].quantity).toBe(0);
+      unsubscribeFirst();
+      unsubscribeSecond();
     });
   });
 

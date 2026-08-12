@@ -237,11 +237,19 @@
 .app-shell {
   display: flex;
   flex-direction: column;
-  /* +1px so every page - even short ones like Lager - is technically taller than the
-     viewport. iOS only finalizes safe-area/viewport metrics once a page is genuinely
-     scrollable; short unscrollable pages otherwise get stuck with a slightly wrong
-     viewport until a manual scroll forces the recalculation. */
-  min-height: calc(100dvh + 1px);
+  /* Fixed (not min-) height + overflow:hidden so the outer document/body never
+     grows with page content. On Android, letting the document scroll behind a
+     position:fixed bottom-nav makes the nav flicker/disappear whenever the
+     address bar collapses or expands during scroll, because the fixed element's
+     containing block gets recalculated against a stale viewport. Confining all
+     scrolling to .app-main (below) keeps body effectively viewport-sized at all
+     times, so header/nav stay reliably pinned on both iOS and Android.
+     +1px so the shell is technically taller than the viewport even on short
+     pages like Lager. iOS only finalizes safe-area/viewport metrics once a page
+     is genuinely scrollable; without this, short pages get stuck with a
+     slightly wrong viewport until a manual scroll forces recalculation. */
+  height: calc(100dvh + 1px);
+  overflow: hidden;
   margin: 0 auto;
   width: 100%;
   max-width: 500px;
@@ -258,6 +266,10 @@
 }
 
 .app-main {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   overscroll-behavior: none;
   padding-bottom: calc(env(safe-area-inset-bottom) + 88px);
 }

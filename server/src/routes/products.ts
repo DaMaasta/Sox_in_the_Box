@@ -26,10 +26,12 @@ function rowToProduct(r: Record<string, unknown>): Product {
   };
 }
 
-// GET /products?spaceId=xxx
+// GET /products?spaceId=xxx | ?spaceIds=xxx,yyy,zzz
 router.get('/', async (req, res) => {
-  const { spaceId } = req.query as { spaceId?: string };
-  const rows = spaceId
+  const { spaceId, spaceIds } = req.query as { spaceId?: string; spaceIds?: string };
+  const rows = spaceIds
+    ? await query('SELECT * FROM products WHERE space_id = ANY($1) ORDER BY name', [spaceIds.split(',')])
+    : spaceId
     ? await query('SELECT * FROM products WHERE space_id = $1 ORDER BY name', [spaceId])
     : await query('SELECT * FROM products ORDER BY name');
   res.json(rows.map(rowToProduct));

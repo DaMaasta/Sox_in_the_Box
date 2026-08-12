@@ -61,7 +61,6 @@ const PAGE_DEPTH: Record<PageName, number> = {
 };
 
 const TAB_PAGES = new Set<PageName>(["Groups", "Dokumente", "Cart", "SearchPage", "Settings"]);
-const TAB_ORDER: PageName[] = ["Dokumente", "Groups", "Cart", "SearchPage", "Settings"];
 
 const HASH_TO_PAGE: Record<string, PageName> = {
   "":            "Groups",
@@ -210,10 +209,8 @@ export default function App(): React.ReactElement {
     const from = PAGE_DEPTH[currentPage] ?? 0;
     const to   = PAGE_DEPTH[page] ?? 0;
     const isTabSwitch = TAB_PAGES.has(currentPage) && TAB_PAGES.has(page);
-    const fromTabIdx = TAB_ORDER.indexOf(currentPage);
-    const toTabIdx   = TAB_ORDER.indexOf(page);
     const dir: NavDirection = isTabSwitch
-      ? (toTabIdx > fromTabIdx ? "forward" : toTabIdx < fromTabIdx ? "back" : "lateral")
+      ? "lateral"
       : to > from ? "forward" : to < from ? "back" : "lateral";
     setNavDir(dir);
     setCurrentPage(page);

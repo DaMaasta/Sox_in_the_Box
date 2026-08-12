@@ -1,25 +1,24 @@
 import React, { useEffect } from "react";
 import type { CSSProperties } from "react";
-import type { NavigateFn, PageParams } from "../App";
-import type { Space } from "../types";
+import type { NavigateFn, PageParams, PageParamsMap } from "../App";
 import UnboxedItems from "../components/UnboxedItems";
 import { useHeader } from "../contexts/HeaderContext";
 
 interface UnboxedDetailProps {
   navigate: NavigateFn;
-  params: PageParams;
+  params: PageParams<"UnboxedDetail">;
 }
 
 export default function UnboxedDetail({ navigate, params }: UnboxedDetailProps): React.ReactElement {
-  const space      = params.space      as Space;
-  const from       = (params.from      as string) ?? "GroupDetail";
-  const fromParam  = (params.fromParam as Record<string, unknown>) ?? {};
+  const space      = params.space;
+  const from       = params.from ?? "GroupDetail";
+  const fromParam  = params.fromParam ?? {};
   const { setHeader } = useHeader();
 
   useEffect(() => {
     setHeader({
       title: "Ohne Box",
-      onBack: () => navigate(from as "GroupDetail" | "Groups", fromParam),
+      onBack: () => navigate(from as "GroupDetail", fromParam as PageParamsMap["GroupDetail"]),
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -57,9 +57,12 @@ export default function Cart({ navigate: _navigate }: CartProps): React.ReactEle
       const totalQty = snapshot.reduce((s, i) => s + i.cartQuantity, 0);
       clearCart();
       setSuccess({ positions: snapshot.length, total: totalQty });
-    } catch {
+    } catch (err) {
       setSubmitted(false);
-      setError("Abbuchung fehlgeschlagen. Bitte versuche es erneut.");
+      const message = err instanceof Error ? err.message : "";
+      setError(message.includes("Nicht genügend Bestand")
+        ? "Der Lagerbestand hat sich geändert. Mindestens ein Artikel ist nicht mehr in der gewünschten Menge verfügbar."
+        : "Abbuchung fehlgeschlagen. Bitte versuche es erneut.");
     } finally {
       setBooking(false);
     }

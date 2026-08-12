@@ -1,9 +1,30 @@
 import { api } from '../config/api';
-import type { Booking, BookingItem, CartItem } from '../types';
+import type { Booking, BookingItem, CartItem, RawBooking } from '../types';
+import { createCachedStore } from '../utils/cachedStore';
+import { applyProductQuantityUpdates, invalidateProductCache } from './products.service';
+import type { ProductQuantityUpdate } from './products.service';
 
-function deserializeBooking(b: Booking): Booking {
+interface BookingMutationResponse {
+  id: string;
+  products?: ProductQuantityUpdate[];
+}
+
+function deserializeBooking(b: RawBooking): Booking {
   return { ...b, createdAt: new Date(b.createdAt) };
 }
+
+function sortBookings(bookings: Booking[]): Booking[] {
+  return bookings.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+}
+
+// Bookings vorher ohne Cache: Verlauf-Tab startete bei jedem Öffnen mit einer leeren
+// Liste und wartete auf den vollen Netzwerk-Roundtrip (Cloudflare Tunnel), während
+// Boxen/Produkte dank Cache sofort erschienen. Gleiches Cache-First-Muster wie dort.
+const store = createCachedStore<RawBooking, Booking>({
+  lsPrefix: 'kistle_bc_',
+  deserialize: deserializeBooking,
+  sort: sortBookings,
+});
 
 export async function createBooking(
   _userId: string,
@@ -24,34 +45,36 @@ export async function createBooking(
     parentName:  i.parentName,
   }));
   const parentIds = [...new Set(items.map(i => i.parentId).filter(Boolean))];
-  const { id: returnedId } = await api.post<{ id: string }>('/bookings', { id, items, parentIds });
-  return returnedId;
+  const response = await api.post<BookingMutationResponse>('/bookings', { id, items, parentIds });
+  if (response.products) applyProductQuantityUpdates(response.products);
+  else invalidateProductCache();
+  store.triggerReload();
+  return response.id;
 }
 
 export async function returnBooking(bookingId: string): Promise<string> {
-  const { id } = await api.post<{ id: string }>(`/bookings/${bookingId}/return`, {});
-  return id;
+  const response = await api.post<BookingMutationResponse>(`/bookings/${bookingId}/return`, {});
+  if (response.products) applyProductQuantityUpdates(response.products);
+  else invalidateProductCache();
+  store.triggerReload();
+  return response.id;
 }
 
 export function subscribeToGroupBookings(
   groupId: string,
   callback: (bookings: Booking[]) => void
 ): () => void {
-  let active = true;
-  async function load() {
-    try {
-      const bookings = await api.get<Booking[]>(`/bookings?groupId=${groupId}`);
-      if (active) callback(bookings.map(deserializeBooking));
-    } catch { /* ignore */ }
-  }
-  load();
-  const interval = setInterval(load, 8000);
-  return () => { active = false; clearInterval(interval); };
+  return store.subscribe(
+    `group:${groupId}`,
+    () => api.get<RawBooking[]>(`/bookings?groupId=${groupId}`),
+    'Buchungen konnten nicht geladen werden',
+    callback
+  );
 }
 
 export async function getBooking(bookingId: string): Promise<Booking | null> {
   try {
-    const booking = await api.get<Booking>(`/bookings/${bookingId}`);
+    const booking = await api.get<RawBooking>(`/bookings/${bookingId}`);
     return deserializeBooking(booking);
   } catch {
     return null;
@@ -62,5 +85,8 @@ export async function createReturnBooking(
   originalBookingId: string,
   items: Array<{ productId: string; quantity: number }>
 ): Promise<void> {
-  await api.post(`/bookings/${originalBookingId}/return`, { items });
+  const response = await api.post<BookingMutationResponse>(`/bookings/${originalBookingId}/return`, { items });
+  if (response.products) applyProductQuantityUpdates(response.products);
+  else invalidateProductCache();
+  store.triggerReload();
 }
